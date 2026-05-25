@@ -529,6 +529,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { Reflector } from "three/addons/objects/Reflector.js";
 RectAreaLightUniformsLib.init();
 
 const config = {
@@ -1126,10 +1127,20 @@ function buildVanity(parent, x, d) {
   spout.position.set(0, 0.18, 0.08); tap.add(spout);
   parent.add(tap);
 
-  const mirM = new THREE.MeshPhysicalMaterial({ color: 0xeeeeee, metalness: 1.0, roughness: 0.02, envMapIntensity: 1.5 });
-  const mir = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.95, 0.018), mirM);
-  mir.position.set(x + cw / 2, 1.55, d - 0.012);
-  parent.add(mir);
+  // Real reflective mirror on south wall (facing -Z, toward room interior)
+  const mirW = 0.7, mirH = 0.95;
+  const mirReflector = new Reflector(new THREE.PlaneGeometry(mirW, mirH), {
+    clipBias: 0.003,
+    textureWidth: 1024,
+    textureHeight: 1024,
+    color: 0xb8c0c4
+  });
+  mirReflector.position.set(x + cw / 2, 1.55, d - 0.013);
+  mirReflector.rotation.y = Math.PI; // reflection plane faces -Z
+  parent.add(mirReflector);
+  // Thin frame behind the mirror so the edges look finished
+  box(parent, mirW + 0.04, mirH + 0.04, 0.012, x + cw / 2, 1.55, d - 0.006,
+    mat({ color: 0x1a1a1a, roughness: 0.4 }));
 
   box(parent, 0.65, 0.025, 0.025, x + cw / 2, 2.05, d - 0.025,
     mat({ color: 0xfff8e0, emissive: 0xfff0c0, emissiveIntensity: 0.6, roughness: 0.85 }));
@@ -1172,11 +1183,20 @@ function buildVanityEastWall(parent, xWall, zStart) {
   spout.position.set(0.08, 0.18, 0); tap.add(spout);
   parent.add(tap);
 
-  // Mirror on east wall above vanity
-  const mirM = new THREE.MeshPhysicalMaterial({ color: 0xeeeeee, metalness: 1.0, roughness: 0.02, envMapIntensity: 1.5 });
-  const mir = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.95, 0.7), mirM);
-  mir.position.set(xWall - 0.012, 1.55, cz);
-  parent.add(mir);
+  // Real reflective mirror on east wall (facing -X, into the bathroom)
+  const mirW = 0.7, mirH = 0.95;
+  const mirReflector = new Reflector(new THREE.PlaneGeometry(mirW, mirH), {
+    clipBias: 0.003,
+    textureWidth: 1024,
+    textureHeight: 1024,
+    color: 0xb8c0c4
+  });
+  mirReflector.position.set(xWall - 0.013, 1.55, cz);
+  mirReflector.rotation.y = -Math.PI / 2; // reflection plane faces -X (into room)
+  parent.add(mirReflector);
+  // Thin frame behind the mirror
+  box(parent, 0.012, mirH + 0.04, mirW + 0.04, xWall - 0.006, 1.55, cz,
+    mat({ color: 0x1a1a1a, roughness: 0.4 }));
 
   // LED above mirror
   box(parent, 0.025, 0.025, 0.65, xWall - 0.025, 2.05, cz,
@@ -1217,23 +1237,38 @@ function buildWasher(parent, x, z) {
 }
 
 function buildRadiator(parent, x, z0, z1) {
+  // Koupelnový žebřík: 2 vertikální postranní sloupky + horizontální žebra mezi nimi
   const rM = mat({ color: 0xffffff, metalness: 0.3, roughness: 0.4 });
-  const bars = 9;
-  const total = z1 - z0, gap = total / (bars - 1);
-  for (let i = 0; i < bars; i++) {
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.10, 16), rM);
-    c.position.set(x + 0.06, 0.65, z0 + i * gap);
-    c.castShadow = true;
-    parent.add(c);
+  const xCenter = x + 0.06;
+  const yBottom = 0.10, yTop = 1.30;
+  const height = yTop - yBottom;
+  const length = z1 - z0;
+
+  // Vertikální sloupky (boční trubky)
+  for (const zz of [z0, z1]) {
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, height + 0.04, 18), rM);
+    post.position.set(xCenter, (yBottom + yTop) / 2, zz);
+    post.castShadow = true;
+    parent.add(post);
   }
-  for (const yy of [0.12, 1.18]) {
-    const h = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, total + 0.04, 16), rM);
-    h.position.set(x + 0.06, yy, z0 + total / 2);
-    h.rotation.x = Math.PI / 2;
-    parent.add(h);
+
+  // Horizontální žebra mezi sloupky
+  const rungs = 12;
+  const gap = height / (rungs - 1);
+  for (let i = 0; i < rungs; i++) {
+    const y = yBottom + i * gap;
+    const rung = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, length, 14), rM);
+    rung.position.set(xCenter, y, (z0 + z1) / 2);
+    rung.rotation.x = Math.PI / 2;
+    rung.castShadow = true;
+    parent.add(rung);
   }
-  box(parent, 0.04, 0.04, 0.06, x + 0.025, 0.4, z0 - 0.04, chrome());
-  box(parent, 0.04, 0.04, 0.06, x + 0.025, 0.9, z0 - 0.04, chrome());
+
+  // Nástěnné držáky a chromované přípojky vody
+  box(parent, 0.04, 0.04, 0.06, x + 0.025, 0.30, z0 - 0.04, chrome());
+  box(parent, 0.04, 0.04, 0.06, x + 0.025, 1.10, z1 + 0.04, chrome());
 }
 
 function buildToiletWC(parent, cx, zWall) {
