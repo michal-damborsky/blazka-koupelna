@@ -195,7 +195,7 @@
       font-weight: 500;
     }
 
-    /* Texture/swatch + file picker */
+    /* Texture/swatch + file picker (legacy) */
     .swatch {
       width: 46px; height: 46px; border-radius: 7px;
       border: 1px solid #ccd1d8; background-size: cover; background-position: center;
@@ -215,6 +215,61 @@
       background: #f0f6f2; border-color: #3d6b4f; color: #3d6b4f;
     }
     .file-pick input[type=file] { display: none; }
+
+    /* Tile library (vzorky) */
+    .lib-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.72rem; color: #6b7480; font-weight: 600;
+      margin: 4px 0 4px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .lib-header span { font-weight: 400; text-transform: none; letter-spacing: 0; color: #98a0a8; }
+    .lib-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .lib-swatch {
+      position: relative;
+      aspect-ratio: 1;
+      border: 2px solid transparent;
+      border-radius: 7px;
+      background-size: cover; background-position: center;
+      background-color: #f5f6f8;
+      cursor: pointer; padding: 0;
+      transition: transform 0.1s, box-shadow 0.12s;
+    }
+    .lib-swatch:hover { transform: scale(1.07); z-index: 1; }
+    .lib-swatch.selected {
+      border-color: #3d6b4f;
+      box-shadow: 0 0 0 2px rgba(61,107,79,0.28), 0 2px 6px rgba(15,30,50,0.10);
+    }
+    .lib-swatch-del {
+      position: absolute; top: 2px; right: 2px;
+      width: 16px; height: 16px;
+      background: rgba(0,0,0,0.55); color: #fff;
+      border: none; border-radius: 50%;
+      font-size: 0.65rem; line-height: 14px;
+      cursor: pointer; padding: 0;
+      opacity: 0; transition: opacity 0.12s;
+    }
+    .lib-swatch:hover .lib-swatch-del { opacity: 1; }
+    .lib-swatch-del:hover { background: rgba(180,40,40,0.85); }
+    .lib-add {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; line-height: 1;
+      color: #6b7480; font-weight: 300;
+      background: #fafbfc;
+      border: 1.5px dashed #c4cad2 !important;
+    }
+    .lib-add:hover {
+      background: #f0f6f2;
+      border-color: #3d6b4f !important;
+      color: #3d6b4f;
+      transform: scale(1.05);
+    }
+    .lib-add input[type=file] { display: none; }
 
     /* Vanity finishes grid */
     .finish-grid {
@@ -392,13 +447,8 @@
           <span class="sec-meta" id="meta-floor"></span>
         </summary>
         <div class="content">
-          <div class="row">
-            <div class="swatch" id="sw-floor"></div>
-            <label class="file-pick">
-              <input type="file" id="file-floor" accept="image/*">
-              <span>Nahrát fotku dlaždice</span>
-            </label>
-          </div>
+          <div class="lib-header">Vzorky <span>klikni pro výběr · + pro nahrání</span></div>
+          <div class="lib-grid" id="lib-floor"></div>
           <div class="row">
             <label>Rozměr</label>
             <input type="number" id="floor-w" value="298" min="50">
@@ -439,13 +489,8 @@
           <span class="sec-meta" id="meta-wall"></span>
         </summary>
         <div class="content">
-          <div class="row">
-            <div class="swatch" id="sw-wall"></div>
-            <label class="file-pick">
-              <input type="file" id="file-wall" accept="image/*">
-              <span>Nahrát fotku obkladu</span>
-            </label>
-          </div>
+          <div class="lib-header">Vzorky <span>klikni pro výběr · + pro nahrání</span></div>
+          <div class="lib-grid" id="lib-wall"></div>
           <div class="row">
             <label>Rozměr</label>
             <input type="number" id="wall-w" value="400" min="50">
@@ -485,13 +530,8 @@
           <span class="sec-meta" id="meta-accent"></span>
         </summary>
         <div class="content">
-          <div class="row">
-            <div class="swatch" id="sw-accent"></div>
-            <label class="file-pick">
-              <input type="file" id="file-accent" accept="image/*">
-              <span>Nahrát fotku akcentu</span>
-            </label>
-          </div>
+          <div class="lib-header">Vzorky <span>klikni pro výběr · + pro nahrání</span></div>
+          <div class="lib-grid" id="lib-accent"></div>
           <div class="row">
             <label>Rozměr</label>
             <input type="number" id="accent-w" value="400" min="50">
@@ -1599,8 +1639,10 @@ function readImageFile(file) {
 
 function setSwatch(elementId, source) {
   if (!source) return;
+  const el = document.getElementById(elementId);
+  if (!el) return;
   const url = (source instanceof HTMLCanvasElement) ? source.toDataURL() : source.src;
-  document.getElementById(elementId).style.backgroundImage = "url(" + url + ")";
+  el.style.backgroundImage = "url(" + url + ")";
 }
 
 function setFloorImage(img) {
@@ -1617,6 +1659,189 @@ function setAccentImage(img) {
   accentTileSource = img;
   rebuildAccentTexture();
   setSwatch("sw-accent", img);
+}
+
+// ---------- Tile library (vzorky) ----------
+
+const TILE_ROLES = ["floor", "wall", "accent"];
+const tileLibrary = { floor: [], wall: [], accent: [] };
+const currentTileSelection = { floor: null, wall: null, accent: null };
+const LIB_LS_KEY = "koupelna.tileLibrary.v1";
+
+function persistTileLibrary() {
+  const out = {};
+  for (const role of TILE_ROLES) {
+    out[role] = tileLibrary[role].filter(e => !e.isDefault);
+  }
+  try { localStorage.setItem(LIB_LS_KEY, JSON.stringify(out)); }
+  catch (e) { console.warn("Library persist failed:", e); }
+}
+
+function loadTileLibraryFromStorage() {
+  try {
+    const raw = localStorage.getItem(LIB_LS_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    for (const role of TILE_ROLES) {
+      if (Array.isArray(data[role])) {
+        tileLibrary[role].push(...data[role].filter(e => e && e.dataURL));
+      }
+    }
+  } catch (e) { console.warn("Library load failed:", e); }
+}
+
+function deriveTileName(file, role) {
+  let name = (file && file.name) ? file.name.replace(/\.[^.]+$/, "").trim() : "";
+  if (!name || name.length < 2) {
+    const n = tileLibrary[role].filter(t => !t.isDefault).length + 1;
+    name = `Vlastní ${n}`;
+  }
+  return name.slice(0, 40);
+}
+
+function addTileToLibrary(role, entry) {
+  tileLibrary[role].push(entry);
+  if (!entry.isDefault) persistTileLibrary();
+  renderTileLibrary(role);
+}
+
+function deleteTileFromLibrary(role, id) {
+  const e = tileLibrary[role].find(x => x.id === id);
+  if (!e || e.isDefault) return;
+  tileLibrary[role] = tileLibrary[role].filter(x => x.id !== id);
+  if (currentTileSelection[role] === id) currentTileSelection[role] = null;
+  persistTileLibrary();
+  renderTileLibrary(role);
+}
+
+async function applyTileSelection(role, entry) {
+  const img = await dataURLToImage(entry.dataURL);
+  if (role === "floor") {
+    floorTileSource = img;
+    document.getElementById("floor-w").value = entry.widthMm;
+    document.getElementById("floor-h").value = entry.heightMm;
+  } else if (role === "wall") {
+    wallTileSource = img;
+    document.getElementById("wall-w").value = entry.widthMm;
+    document.getElementById("wall-h").value = entry.heightMm;
+  } else if (role === "accent") {
+    accentTileSource = img;
+    document.getElementById("accent-w").value = entry.widthMm;
+    document.getElementById("accent-h").value = entry.heightMm;
+  }
+  currentTileSelection[role] = entry.id;
+  applyAndRebuild();
+  renderTileLibrary(role);
+}
+
+function renderTileLibrary(role) {
+  const container = document.getElementById(`lib-${role}`);
+  if (!container) return;
+  container.innerHTML = "";
+
+  for (const entry of tileLibrary[role]) {
+    const btn = document.createElement("button");
+    btn.className = "lib-swatch";
+    if (entry.id === currentTileSelection[role]) btn.classList.add("selected");
+    btn.title = `${entry.name} · ${entry.widthMm}×${entry.heightMm} mm` + (entry.isDefault ? " · výchozí" : "");
+    btn.style.backgroundImage = `url(${entry.dataURL})`;
+    btn.dataset.id = entry.id;
+    btn.addEventListener("click", () => applyTileSelection(role, entry));
+    if (!entry.isDefault) {
+      const del = document.createElement("button");
+      del.className = "lib-swatch-del";
+      del.title = "Odstranit z knihovny";
+      del.textContent = "×";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (confirm(`Odstranit vzorek "${entry.name}" z knihovny?`)) {
+          deleteTileFromLibrary(role, entry.id);
+        }
+      });
+      btn.appendChild(del);
+    }
+    container.appendChild(btn);
+  }
+
+  // "+" upload tile
+  const addLabel = document.createElement("label");
+  addLabel.className = "lib-swatch lib-add";
+  addLabel.title = "Nahrát novou dlaždici/obklad";
+  addLabel.textContent = "+";
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.accept = "image/*";
+  inp.addEventListener("change", async (e) => {
+    if (!e.target.files[0]) return;
+    const file = e.target.files[0];
+    const img = await readImageFile(file);
+    const widthDefault  = role === "floor" ? 298 : 400;
+    const heightDefault = role === "floor" ? 298 : 200;
+    const entry = {
+      id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: deriveTileName(file, role),
+      dataURL: sourceToDataURL(img),
+      widthMm:  +document.getElementById(`${role}-w`).value || widthDefault,
+      heightMm: +document.getElementById(`${role}-h`).value || heightDefault
+    };
+    addTileToLibrary(role, entry);
+    await applyTileSelection(role, entry);
+    e.target.value = "";
+  });
+  addLabel.appendChild(inp);
+  container.appendChild(addLabel);
+}
+
+function initDefaultLibraryEntries() {
+  // Default floor (z aktuálního floorTileSource po init())
+  if (floorTileSource && !tileLibrary.floor.some(e => e.id === "default-floor")) {
+    tileLibrary.floor.unshift({
+      id: "default-floor",
+      name: "Patchwork (výchozí)",
+      dataURL: sourceToDataURL(floorTileSource),
+      widthMm: 298, heightMm: 298, isDefault: true
+    });
+  }
+  if (wallTileSource && !tileLibrary.wall.some(e => e.id === "default-wall")) {
+    tileLibrary.wall.unshift({
+      id: "default-wall",
+      name: "Bílý matný (výchozí)",
+      dataURL: sourceToDataURL(wallTileSource),
+      widthMm: 400, heightMm: 200, isDefault: true
+    });
+  }
+  if (accentTileSource && !tileLibrary.accent.some(e => e.id === "default-accent")) {
+    tileLibrary.accent.unshift({
+      id: "default-accent",
+      name: "Bílý matný (výchozí)",
+      dataURL: sourceToDataURL(accentTileSource),
+      widthMm: 400, heightMm: 200, isDefault: true
+    });
+  }
+  // Default selections
+  if (!currentTileSelection.floor)  currentTileSelection.floor  = "default-floor";
+  if (!currentTileSelection.wall)   currentTileSelection.wall   = "default-wall";
+  if (!currentTileSelection.accent) currentTileSelection.accent = "default-accent";
+}
+
+function syncLibraryDimsFromConfig() {
+  // Aktualizovat rozměry u aktuálně vybraného uživatelského vzorku
+  const updates = [
+    { role: "floor",  w: Math.round(config.floorTileW * 1000),  h: Math.round(config.floorTileH * 1000) },
+    { role: "wall",   w: Math.round(config.wallTileW * 1000),   h: Math.round(config.wallTileH * 1000) },
+    { role: "accent", w: Math.round(config.accentTileW * 1000), h: Math.round(config.accentTileH * 1000) }
+  ];
+  let changed = false;
+  for (const { role, w, h } of updates) {
+    const id = currentTileSelection[role];
+    if (!id) continue;
+    const e = tileLibrary[role].find(x => x.id === id);
+    if (!e || e.isDefault) continue;
+    if (e.widthMm !== w || e.heightMm !== h) {
+      e.widthMm = w; e.heightMm = h; changed = true;
+    }
+  }
+  if (changed) persistTileLibrary();
 }
 
 function debounce(fn, wait) {
@@ -1675,6 +1900,7 @@ function readConfigFromUI() {
 
 function applyAndRebuild() {
   readConfigFromUI();
+  syncLibraryDimsFromConfig();
   rebuildFloorTexture();
   rebuildWallTexture();
   rebuildAccentTexture();
@@ -1861,9 +2087,10 @@ async function loadDesign(file) {
   if (data.images?.accent) accentTileSource = await dataURLToImage(data.images.accent).catch(() => accentTileSource);
 
   syncUIFromConfig();
-  setSwatch("sw-floor",  floorTileSource);
-  setSwatch("sw-wall",   wallTileSource);
-  setSwatch("sw-accent", accentTileSource);
+
+  // Načtený návrh přepisuje knihovní výběr – obklady přijdou ze souboru.
+  // Označení v knihovně se vyčistí, dokud uživatel znovu neklikne na vzorek.
+  TILE_ROLES.forEach(role => { currentTileSelection[role] = null; renderTileLibrary(role); });
 
   rebuildFloorTexture();
   rebuildWallTexture();
@@ -1923,28 +2150,7 @@ function setActiveViewButton(view) {
 }
 
 function setupUI() {
-  // File uploads
-  document.getElementById("file-floor").addEventListener("change", async (e) => {
-    if (e.target.files[0]) {
-      const img = await readImageFile(e.target.files[0]);
-      setFloorImage(img);
-      applyAndRebuild();
-    }
-  });
-  document.getElementById("file-wall").addEventListener("change", async (e) => {
-    if (e.target.files[0]) {
-      const img = await readImageFile(e.target.files[0]);
-      setWallImage(img);
-      applyAndRebuild();
-    }
-  });
-  document.getElementById("file-accent").addEventListener("change", async (e) => {
-    if (e.target.files[0]) {
-      const img = await readImageFile(e.target.files[0]);
-      setAccentImage(img);
-      applyAndRebuild();
-    }
-  });
+  // Nahrávání souborů řeší knihovna vzorků (lib-grid + ikona "+")
 
   // Selects — immediate apply on change
   ["floor-bond", "floor-direction", "wall-bond", "wall-direction",
@@ -2001,18 +2207,22 @@ async function init() {
   const defaultImg = await loadDefaultFloorImage();
   floorTileSource = defaultImg || makeProceduralFloorCanvas();
   wallTileSource  = makeProceduralWallCanvas();
-  // accent default = same procedural wall tile until user uploads custom image
   accentTileSource = makeProceduralWallCanvas();
 
   rebuildFloorTexture();
   rebuildWallTexture();
   rebuildAccentTexture();
-  setSwatch("sw-floor",  floorTileSource);
-  setSwatch("sw-wall",   wallTileSource);
-  setSwatch("sw-accent", accentTileSource);
+
+  // Knihovna vzorků: výchozí položky + uložené uživatelské
+  loadTileLibraryFromStorage();
+  initDefaultLibraryEntries();
 
   setupLights();
   setupUI();
+
+  // Vykreslit knihovnu po setupUI (target containery existují)
+  TILE_ROLES.forEach(renderTileLibrary);
+
   rebuildScene();
   setView("default");
   setActiveViewButton("default");
