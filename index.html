@@ -218,16 +218,25 @@
       margin-top: 6px; font-weight: 500;
     }
 
-    /* Bath wall plan */
+    /* Wall plans */
+    .room-plan-label {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.74rem; color: #4a5460; font-weight: 600;
+      margin: 4px 0 4px;
+    }
+    .room-plan-label span {
+      color: #98a0a8; font-weight: 400; font-variant-numeric: tabular-nums;
+    }
     .wall-plan {
       position: relative;
       width: 100%;
       aspect-ratio: 166/164;
       background: #f5f6f8;
       border-radius: 8px;
-      margin: 4px 0 10px;
+      margin: 0 0 10px;
       user-select: none;
     }
+    .wall-plan.wc-plan { aspect-ratio: 120/86; }
     .wall-plan .wall-btn {
       position: absolute;
       background: #d6dadf;
@@ -244,6 +253,21 @@
     .wall-plan .wall-btn.accent:hover {
       background: linear-gradient(135deg, #c19562 0%, #a07a47 100%);
     }
+    .wall-plan .wall-btn.shared {
+      background: repeating-linear-gradient(
+        135deg,
+        #e4e8ed 0px, #e4e8ed 4px,
+        #eef1f4 4px, #eef1f4 8px
+      );
+      color: #98a0a8;
+      cursor: not-allowed;
+      font-size: 0.65rem;
+    }
+    .wall-plan .wall-btn.shared:hover { background: repeating-linear-gradient(
+      135deg,
+      #e4e8ed 0px, #e4e8ed 4px,
+      #eef1f4 4px, #eef1f4 8px
+    ); }
     .wall-plan .wall-btn.north {
       top: 0; left: 0; right: 0; height: 18%;
       border-radius: 8px 8px 0 0;
@@ -282,6 +306,8 @@
     }
     .legend-chip.primary { background: #d6dadf; }
     .legend-chip.accent { background: linear-gradient(135deg, #d4a574 0%, #b88a55 100%); }
+    .legend-chip.shared { background: repeating-linear-gradient(
+      135deg, #e4e8ed 0px, #e4e8ed 3px, #eef1f4 3px, #eef1f4 6px); }
 
     /* Loading */
     #loading {
@@ -462,19 +488,31 @@
       <details class="section" open>
         <summary>
           <span class="sec-icon">⊞</span>
-          <span class="sec-label">Stěny koupelny</span>
+          <span class="sec-label">Stěny</span>
         </summary>
         <div class="content">
-          <div class="wall-plan" id="bath-wall-plan">
-            <button class="wall-btn north primary" data-wall="north" title="Severní stěna (sprcha) — klikni pro Primární/Akcent">S</button>
-            <button class="wall-btn south primary" data-wall="south" title="Jižní stěna (dveře) — klikni pro Primární/Akcent">J</button>
-            <button class="wall-btn west primary" data-wall="west" title="Západní stěna (radiátor) — klikni pro Primární/Akcent">Z</button>
-            <button class="wall-btn east primary" data-wall="east" title="Východní stěna (umyvadlo) — klikni pro Primární/Akcent">V</button>
-            <div class="wall-center">Koupelna<small>klikni stěnu pro změnu</small></div>
+          <div class="room-plan-label">Koupelna <span>166 × 164</span></div>
+          <div class="wall-plan" data-room="bath">
+            <button class="wall-btn north primary" data-room="bath" data-wall="north" title="Severní stěna (sprcha)">S</button>
+            <button class="wall-btn south primary" data-room="bath" data-wall="south" title="Jižní stěna (dveře)">J</button>
+            <button class="wall-btn west primary"  data-room="bath" data-wall="west"  title="Západní stěna (radiátor)">Z</button>
+            <button class="wall-btn east primary"  data-room="bath" data-wall="east"  title="Východní stěna (umyvadlo)">V</button>
+            <div class="wall-center">Koupelna<small>klikni stěnu</small></div>
           </div>
+
+          <div class="room-plan-label">WC <span>120 × 86</span></div>
+          <div class="wall-plan wc-plan" data-room="wc">
+            <button class="wall-btn north primary" data-room="wc" data-wall="north" title="Severní stěna (dveře)">S</button>
+            <div class="wall-btn south shared" title="Sdílená stěna s koupelnou – řídí se severní stěnou koupelny">sdílená</div>
+            <button class="wall-btn west primary"  data-room="wc" data-wall="west"  title="Západní stěna (toaleta)">Z</button>
+            <button class="wall-btn east primary"  data-room="wc" data-wall="east"  title="Východní stěna">V</button>
+            <div class="wall-center">WC<small>klikni stěnu</small></div>
+          </div>
+
           <div class="wall-plan-legend">
             <span><span class="legend-chip primary"></span>Primární</span>
             <span><span class="legend-chip accent"></span>Akcent</span>
+            <span><span class="legend-chip shared"></span>Sdílená</span>
           </div>
         </div>
       </details>
@@ -552,6 +590,8 @@ const config = {
   accentRotation: 0,
   // Přiřazení obkladů na stěny koupelny ("primary" | "accent")
   bathWallSlots: { north: "primary", south: "primary", east: "primary", west: "primary" },
+  // Přiřazení obkladů na stěny WC (south je sdílená s koupelnou – řízeno bathWallSlots.north)
+  wcWallSlots:   { north: "primary", south: "primary", east: "primary", west: "primary" },
   // Dekor umyvadlové skříňky
   vanityFinish: "lightOak"
 };
@@ -1379,7 +1419,7 @@ function rebuildScene() {
 
   // WC: south wall is shared (rendered by bathroom as its north wall) – do not build here.
   const wcWalls = { north: true, south: false, east: true, west: true };
-  const wcShell = buildRoomShell(sceneRoot, wcOriginX, wcOriginZ, ww, wd, h, wcWalls);
+  const wcShell = buildRoomShell(sceneRoot, wcOriginX, wcOriginZ, ww, wd, h, wcWalls, config.wcWallSlots);
   const wcRoom = wcShell.group;
 
   registerDynamicWall(wcShell.walls.north, cam => cam.z > wcOriginZ + wd);
@@ -1579,6 +1619,13 @@ function updateMetaLabels() {
   if (el("meta-vanity")) el("meta-vanity").textContent = (VANITY_PRESETS[config.vanityFinish]?.label || "");
   if (el("meta-rooms"))  el("meta-rooms").textContent  =
     `${(config.bathW*100|0)}×${(config.bathD*100|0)} · ${(config.wcW*100|0)}×${(config.wcD*100|0)} cm`;
+  // Rozměry v hlavičkách plánů stěn
+  document.querySelectorAll(".room-plan-label").forEach(lbl => {
+    const span = lbl.querySelector("span");
+    if (!span) return;
+    if (/Koupelna/i.test(lbl.textContent)) span.textContent = `${(config.bathW*100|0)} × ${(config.bathD*100|0)} cm`;
+    else if (/WC/i.test(lbl.textContent))  span.textContent = `${(config.wcW*100|0)} × ${(config.wcD*100|0)} cm`;
+  });
 }
 
 function getFinishSwatchUrl(finishName) {
@@ -1625,16 +1672,19 @@ function setupFinishGrid() {
 }
 
 function setupWallPlan() {
-  const buttons = document.querySelectorAll("#bath-wall-plan .wall-btn");
+  const buttons = document.querySelectorAll(".wall-plan .wall-btn[data-wall]");
   buttons.forEach(btn => {
-    const dir = btn.dataset.wall;
-    const slot = config.bathWallSlots[dir];
+    if (btn.classList.contains("shared")) return; // not interactive
+    const room = btn.dataset.room;
+    const dir  = btn.dataset.wall;
+    const slotsKey = (room === "wc") ? "wcWallSlots" : "bathWallSlots";
+    const slot = config[slotsKey][dir];
     btn.classList.toggle("accent", slot === "accent");
     btn.classList.toggle("primary", slot !== "accent");
     btn.addEventListener("click", () => {
-      const cur = config.bathWallSlots[dir];
+      const cur = config[slotsKey][dir];
       const next = (cur === "accent") ? "primary" : "accent";
-      config.bathWallSlots[dir] = next;
+      config[slotsKey][dir] = next;
       btn.classList.toggle("accent", next === "accent");
       btn.classList.toggle("primary", next !== "accent");
       applyAndRebuild();
