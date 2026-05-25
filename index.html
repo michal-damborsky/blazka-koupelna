@@ -1999,24 +1999,54 @@ function setupWallPlan() {
 
 // ---------- Screenshot ----------
 
-function downloadDataUrl(dataUrl, filename) {
+async function saveBlobWithDialog(blob, defaultName, kind) {
+  // kind: "png" nebo "json"
+  const fileTypes = (kind === "png")
+    ? [{ description: "PNG snímek", accept: { "image/png": [".png"] } }]
+    : [{ description: "Návrh koupelny (JSON)", accept: { "application/json": [".json"] } }];
+
+  // Moderní File System Access API (Chrome/Edge): nativní 'Uložit jako'
+  if ("showSaveFilePicker" in window) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: defaultName,
+        types: fileTypes
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch (err) {
+      if (err && err.name === "AbortError") return false; // uživatel zrušil
+      console.warn("showSaveFilePicker selhal, používám fallback:", err);
+    }
+  }
+
+  // Fallback (Firefox / Safari): zeptat se na název a stáhnout
+  let name = prompt("Název souboru:", defaultName);
+  if (name === null) return false;
+  name = name.trim();
+  if (!name) return false;
+  const ext = "." + kind;
+  if (!name.toLowerCase().endsWith(ext)) name += ext;
+
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = dataUrl;
-  a.download = filename;
+  a.href = url;
+  a.download = name;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 }
 
 function takeScreenshot() {
-  // Vyrenderovat aktuální snímek (preserveDrawingBuffer není zapnut – render musí proběhnout teď)
   renderer.render(scene, camera);
-  renderer.domElement.toBlob(blob => {
+  renderer.domElement.toBlob(async (blob) => {
     if (!blob) return;
-    const url = URL.createObjectURL(blob);
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    downloadDataUrl(url, `koupelna-${ts}.png`);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    await saveBlobWithDialog(blob, `koupelna-${ts}.png`, "png");
   }, "image/png");
 }
 
@@ -2044,7 +2074,7 @@ function dataURLToImage(dataURL) {
   });
 }
 
-function saveDesign() {
+async function saveDesign() {
   const data = {
     version: 1,
     timestamp: new Date().toISOString(),
@@ -2056,10 +2086,8 @@ function saveDesign() {
     }
   };
   const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  downloadDataUrl(url, `koupelna-navrh-${ts}.json`);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  await saveBlobWithDialog(blob, `koupelna-navrh-${ts}.json`, "json");
 }
 
 async function loadDesign(file) {
