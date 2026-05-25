@@ -1146,18 +1146,20 @@ function makeGroutPlane(w, h) {
   return t;
 }
 
-// Door panel + frame (visible regardless of wall presence)
+// Door panel + frame. Vrací THREE.Group, aby šel celý komplet
+// hromadně skrýt společně s mateřskou stěnou v dollhouse pohledu.
 function buildDoorPanel(parent, xCenter, zWall, facing, dw) {
   // facing: "south" = door faces -Z (opens south), "north" = +Z, "east" = +X, "west" = -X
-  const dh = 2.05, frameT = 0.04;
+  const dh = 2.05;
   const woodM = makeDoorMaterial();
-  // Rám se ladí s plochou dveří – pokud jsou dveře barevné, rám je o trochu světlejší/tmavší.
-  // U bílých dveří je rám čistá bílá. U dřevěných stejný rám jako dříve (světle šedá).
   const doorPreset = VANITY_PRESETS[config.doorFinish] || VANITY_PRESETS.whiteMatte;
   const frameColor = doorPreset.kind === "wood" ? 0xeeeeee : 0xf6f6f6;
   const frameM = mat({ color: frameColor, roughness: 0.6 });
 
-  let dx, dy, dz, doorBoxW, doorBoxD;
+  const group = new THREE.Group();
+  parent.add(group);
+
+  let dx, dz, doorBoxW, doorBoxD;
   if (facing === "south" || facing === "north") {
     doorBoxW = dw; doorBoxD = 0.04;
     dx = xCenter; dz = zWall;
@@ -1169,16 +1171,16 @@ function buildDoorPanel(parent, xCenter, zWall, facing, dw) {
   const door = new THREE.Mesh(new THREE.BoxGeometry(doorBoxW, dh, doorBoxD), woodM);
   door.position.set(dx, dh / 2, dz);
   door.castShadow = true;
-  parent.add(door);
+  group.add(door);
 
   if (facing === "south" || facing === "north") {
-    box(parent, dw + 0.10, 0.06, 0.06, dx, dh + 0.03, dz, frameM);
-    box(parent, 0.05, dh + 0.06, 0.06, dx - dw / 2 - 0.025, dh / 2, dz, frameM);
-    box(parent, 0.05, dh + 0.06, 0.06, dx + dw / 2 + 0.025, dh / 2, dz, frameM);
+    box(group, dw + 0.10, 0.06, 0.06, dx, dh + 0.03, dz, frameM);
+    box(group, 0.05, dh + 0.06, 0.06, dx - dw / 2 - 0.025, dh / 2, dz, frameM);
+    box(group, 0.05, dh + 0.06, 0.06, dx + dw / 2 + 0.025, dh / 2, dz, frameM);
   } else {
-    box(parent, 0.06, 0.06, dw + 0.10, dx, dh + 0.03, dz, frameM);
-    box(parent, 0.06, dh + 0.06, 0.05, dx, dh / 2, dz - dw / 2 - 0.025, frameM);
-    box(parent, 0.06, dh + 0.06, 0.05, dx, dh / 2, dz + dw / 2 + 0.025, frameM);
+    box(group, 0.06, 0.06, dw + 0.10, dx, dh + 0.03, dz, frameM);
+    box(group, 0.06, dh + 0.06, 0.05, dx, dh / 2, dz - dw / 2 - 0.025, frameM);
+    box(group, 0.06, dh + 0.06, 0.05, dx, dh / 2, dz + dw / 2 + 0.025, frameM);
   }
 
   const handleM = chrome();
@@ -1187,14 +1189,16 @@ function buildDoorPanel(parent, xCenter, zWall, facing, dw) {
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.10, 16), handleM);
     handle.position.set(dx + dw * 0.35, dh * 0.5, dz + sgn * 0.04);
     handle.rotation.x = Math.PI / 2;
-    parent.add(handle);
+    group.add(handle);
   } else {
     const sgn = facing === "west" ? -1 : 1;
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.10, 16), handleM);
     handle.position.set(dx + sgn * 0.04, dh * 0.5, dz + dw * 0.35);
     handle.rotation.z = Math.PI / 2;
-    parent.add(handle);
+    group.add(handle);
   }
+
+  return group;
 }
 
 // Malé rohové umyvadlo v JV rohu WC (jih + východ).
@@ -1752,7 +1756,9 @@ function rebuildScene() {
   buildVanityEastWall(bathRoom, bw, 0.10);
   buildWasher(bathRoom, 0.05, bd - 0.62);
   buildRadiator(bathRoom, 0, 0.10, Math.min(0.10 + 0.7, bd - 0.70));
-  buildDoorPanel(bathRoom, 0.45, 0.05, "south", 0.70);
+  // Dveře koupelny (jih) – skrývat společně s jižní stěnou
+  const bathDoor = buildDoorPanel(bathRoom, 0.45, 0.05, "south", 0.70);
+  registerDynamicWall(bathDoor, cam => cam.z < bathOriginZ);
 
   // WC: south wall is shared (rendered by bathroom as its north wall) – do not build here.
   const wcWalls = { north: true, south: false, east: true, west: true };
@@ -1771,7 +1777,9 @@ function rebuildScene() {
   }
   // Malé rohové umyvadlo v JV rohu
   buildCornerSinkSE(wcRoom, ww, 0);
-  buildDoorPanel(wcRoom, ww / 2, wd - 0.05, "north", 0.62);
+  // Dveře WC (sever) – skrývat společně se severní stěnou WC
+  const wcDoor = buildDoorPanel(wcRoom, ww / 2, wd - 0.05, "north", 0.62);
+  registerDynamicWall(wcDoor, cam => cam.z > wcOriginZ + wd);
 
   // Sdílená stěna mezi koupelnou a WC: jedna fyzická stěna, ale každá strana
   // má vlastní obklad. Bath.north = strana koupelny, WC.south = strana WC.
