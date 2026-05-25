@@ -1733,15 +1733,23 @@ function rebuildScene() {
   applySharedWallMaterials(bathShell, bw, h);
 
   // V WC obklad jen do dané výšky – nad bílá omítka.
-  // Overlay panely se musí skrývat společně s mateřskou stěnou,
-  // jinak by „prosvítání skrz stěnu" v dollhouse pohledu nefungovalo.
+  // Bílý nátěr lícuje s plochou stěny (žádná hloubka).
   const wcPaint = buildWCWhitePaintAbove(wcRoom, ww, wd, h, config.wcTileMaxHeight);
   if (wcPaint) {
     if (wcPaint.north) registerDynamicWall(wcPaint.north, cam => cam.z > wcOriginZ + wd);
     if (wcPaint.east)  registerDynamicWall(wcPaint.east,  cam => cam.x > wcOriginX + ww);
     if (wcPaint.west)  registerDynamicWall(wcPaint.west,  cam => cam.x < wcOriginX);
-    // wcPaint.south = bílá vrstva nad sdílenou stěnou — sdílená stěna se nikdy neskrývá,
-    // takže ani overlay nemá co skrývat.
+    // wcPaint.south leží nad sdílenou stěnou – ta se nikdy neskrývá.
+  }
+  // Obkladová deska v WC pod tileH vystupuje 1 cm před plochu stěny (bílý nátěr).
+  // Západní cap nepotřebujeme, pokud je zapnutý Geberit (předstěna pokrývá celou západní stěnu).
+  const wcCaps = buildWCTileCaps(wcRoom, ww, wd, h, config.wcTileMaxHeight,
+    config.wcWallSlots, !config.wcGeberitEnabled);
+  if (wcCaps) {
+    if (wcCaps.north) registerDynamicWall(wcCaps.north, cam => cam.z > wcOriginZ + wd);
+    if (wcCaps.east)  registerDynamicWall(wcCaps.east,  cam => cam.x > wcOriginX + ww);
+    if (wcCaps.west)  registerDynamicWall(wcCaps.west,  cam => cam.x < wcOriginX);
+    // wcCaps.south sedí na sdílené stěně – nikdy neskrývat.
   }
 
   const cx = bw / 2;
@@ -1752,30 +1760,97 @@ function rebuildScene() {
 }
 
 // Bílý nátěr na WC stěnách nad výškou obkladu.
-// Renderujeme jako tenké overlay panely zevnitř WC, které překryjí horní část obkladu.
-// Vrací overlay meshe podle směru, aby je bylo možné napojit na dynamické skrývání stěn.
+// Lícuje s plochou stěny (žádná hloubka) – jen 1 mm proti z-fightingu.
 function buildWCWhitePaintAbove(parent, ww, wd, h, tileH) {
   if (!Number.isFinite(tileH) || tileH >= h - 0.001) return null;
   const stripH = h - tileH;
   const stripY = tileH + stripH / 2;
-  const offset = 0.005; // vrstva 5 mm dovnitř WC – stabilní bez z-fightingu
-  const T = 0.012; // tloušťka overlay panelu (čistě vizuální)
-  const paint = mat({ color: 0xfaf8f4, roughness: 0.85, metalness: 0 });
+  const offset = 0.001; // 1 mm – prakticky lícuje
+  const paint = mat({ color: 0xfaf8f4, roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
+
+  function plane(w, h, px, py, pz, ry) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), paint);
+    m.position.set(px, py, pz);
+    if (ry) m.rotation.y = ry;
+    m.receiveShadow = true;
+    parent.add(m);
+    return m;
+  }
 
   const overlays = {};
-  // Sever (zadní stěna WC): panel přilepený zevnitř na +Z stěnu (parent = wcRoom)
-  overlays.north = box(parent, ww, stripH, T,
-      ww / 2, stripY, wd - offset - T / 2, paint);
-  // Jih (sdílená stěna): zevnitř WC = z=0
-  overlays.south = box(parent, ww, stripH, T,
-      ww / 2, stripY, offset + T / 2, paint);
-  // Západ (kde je toaleta): zevnitř WC
-  overlays.west = box(parent, T, stripH, wd,
-      offset + T / 2, stripY, wd / 2, paint);
-  // Východ: zevnitř WC
-  overlays.east = box(parent, T, stripH, wd,
-      ww - offset - T / 2, stripY, wd / 2, paint);
+  // Sever (zadní stěna WC, normála −Z): otočit plane o π
+  overlays.north = plane(ww, stripH, ww / 2, stripY, wd - offset, Math.PI);
+  // Jih (sdílená stěna, normála +Z): bez rotace
+  overlays.south = plane(ww, stripH, ww / 2, stripY, offset, 0);
+  // Západ (normála +X)
+  overlays.west  = plane(wd, stripH, offset, stripY, wd / 2, Math.PI / 2);
+  // Východ (normála −X)
+  overlays.east  = plane(wd, stripH, ww - offset, stripY, wd / 2, -Math.PI / 2);
   return overlays;
+}
+
+// Obkladová deska na WC stěnách (pod tileH) vystupuje 1 cm před plochu stěny.
+// Bílý nátěr nahoře potom působí jako mírně zapuštěný oproti obkladu.
+// includeWest = false, pokud je zapnutý Geberit (předstěna pokrývá západní stěnu).
+function buildWCTileCaps(parent, ww, wd, h, tileH, slots, includeWest) {
+  if (!Number.isFinite(tileH) || tileH <= 0.05) return null;
+  const capH = Math.min(tileH, h);
+  const proud = 0.010;       // 1 cm vystoupení do prostoru
+  const T = 0.012;           // 12 mm tloušťka boxu (back face zalitý ve stěně)
+  const capY = capH / 2;
+  const caps = {};
+
+  function pair(slot, faceW, faceH) {
+    const tile = makeWallMaterial(faceW, faceH, slot);
+    const groutColor = (slot === "accent") ? config.accentGroutColor : config.wallGroutColor;
+    const grout = mat({ color: groutColor, roughness: 0.6 });
+    return { tile, grout };
+  }
+
+  // BoxGeometry face material order: [+X, -X, +Y, -Y, +Z, -Z]
+
+  // Sever: front face = -Z (do WC). Front má být v z = wd - proud,
+  // tedy centrum boxu z = (wd - proud) + T/2.
+  {
+    const { tile, grout } = pair(slots.north, ww, capH);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(ww, capH, T),
+      [grout, grout, grout, grout, grout, tile]);
+    m.position.set(ww / 2, capY, (wd - proud) + T / 2);
+    m.castShadow = true; m.receiveShadow = true;
+    parent.add(m); caps.north = m;
+  }
+
+  // Jih (sdílená): front face = +Z, center z = +0.004
+  {
+    const { tile, grout } = pair(slots.south, ww, capH);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(ww, capH, T),
+      [grout, grout, grout, grout, tile, grout]);
+    m.position.set(ww / 2, capY, 0.004);
+    m.castShadow = true; m.receiveShadow = true;
+    parent.add(m); caps.south = m;
+  }
+
+  // Východ: front face = -X, center x = ww - 0.004
+  {
+    const { tile, grout } = pair(slots.east, wd, capH);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(T, capH, wd),
+      [grout, tile, grout, grout, grout, grout]);
+    m.position.set(ww - 0.004, capY, wd / 2);
+    m.castShadow = true; m.receiveShadow = true;
+    parent.add(m); caps.east = m;
+  }
+
+  // Západ: front face = +X, center x = 0.004 (jen bez Geberitu)
+  if (includeWest) {
+    const { tile, grout } = pair(slots.west, wd, capH);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(T, capH, wd),
+      [tile, grout, grout, grout, grout, grout]);
+    m.position.set(0.004, capY, wd / 2);
+    m.castShadow = true; m.receiveShadow = true;
+    parent.add(m); caps.west = m;
+  }
+
+  return caps;
 }
 
 function applySharedWallMaterials(bathShell, w, h) {
