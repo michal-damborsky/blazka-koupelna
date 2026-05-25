@@ -297,6 +297,24 @@
       margin-top: 6px; font-weight: 500;
     }
 
+    /* Vnitřní dělič sekce a podnadpis (např. v Akcent → Přiřazení na stěny) */
+    .subsection-divider {
+      height: 1px; background: #e4e8ed;
+      margin: 12px -2px 10px;
+    }
+    .subsection-label {
+      display: flex; align-items: baseline; justify-content: space-between;
+      font-size: 0.72rem; color: #4a5460; font-weight: 600;
+      margin: 0 0 6px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .subsection-label span {
+      color: #98a0a8; font-weight: 500;
+      text-transform: none; letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.7rem;
+    }
+
     /* Wall plans */
     .wall-plans-grid {
       display: grid;
@@ -528,7 +546,7 @@
       <details class="section">
         <summary>
           <span class="sec-icon">◈</span>
-          <span class="sec-label">Akcent</span>
+          <span class="sec-label">Akcent &amp; stěny</span>
           <span class="sec-meta" id="meta-accent"></span>
         </summary>
         <div class="content">
@@ -563,6 +581,36 @@
               <option value="1.5707963267948966">Na výšku (90°)</option>
             </select>
           </div>
+
+          <div class="subsection-divider"></div>
+          <div class="subsection-label">Přiřazení na stěny <span id="meta-walls"></span></div>
+          <div class="wall-plans-grid">
+            <div class="room-plan-block">
+              <div class="room-plan-label">Koupelna <span>166×164</span></div>
+              <div class="wall-plan" data-room="bath">
+                <button class="wall-btn north primary" data-room="bath" data-wall="north" title="Sever (sprcha)">S</button>
+                <button class="wall-btn south primary" data-room="bath" data-wall="south" title="Jih (dveře)">J</button>
+                <button class="wall-btn west primary"  data-room="bath" data-wall="west"  title="Západ (radiátor)">Z</button>
+                <button class="wall-btn east primary"  data-room="bath" data-wall="east"  title="Východ (umyvadlo)">V</button>
+                <div class="wall-center">Koupelna</div>
+              </div>
+            </div>
+            <div class="room-plan-block">
+              <div class="room-plan-label">WC <span>120×86</span></div>
+              <div class="wall-plan wc-plan" data-room="wc">
+                <button class="wall-btn north primary" data-room="wc" data-wall="north" title="Sever (dveře)">S</button>
+                <button class="wall-btn south primary" data-room="wc" data-wall="south" title="Jih (sdílená)">J</button>
+                <button class="wall-btn west primary"  data-room="wc" data-wall="west"  title="Západ (toaleta / Geberit)">Z</button>
+                <button class="wall-btn east primary"  data-room="wc" data-wall="east"  title="Východ">V</button>
+                <div class="wall-center">WC</div>
+              </div>
+            </div>
+          </div>
+          <div class="wall-plan-legend">
+            <span><span class="legend-chip primary"></span>Primární</span>
+            <span><span class="legend-chip accent"></span>Akcent</span>
+          </div>
+          <p class="hint">Klikni stěnu pro přepnutí. Sdílená stěna má každou stranu nezávislou.</p>
         </div>
       </details>
 
@@ -618,44 +666,6 @@
             <span class="unit">cm</span>
           </div>
           <p class="hint">Vertikální akcentní pás uvnitř sprchy v dekoru sekce „Akcent" (výchozí = podlahový vzor).</p>
-        </div>
-      </details>
-
-      <details class="section">
-        <summary>
-          <span class="sec-icon">⊞</span>
-          <span class="sec-label">Stěny</span>
-          <span class="sec-meta" id="meta-walls"></span>
-        </summary>
-        <div class="content">
-          <div class="wall-plans-grid">
-            <div class="room-plan-block">
-              <div class="room-plan-label">Koupelna <span>166×164</span></div>
-              <div class="wall-plan" data-room="bath">
-                <button class="wall-btn north primary" data-room="bath" data-wall="north" title="Sever (sprcha)">S</button>
-                <button class="wall-btn south primary" data-room="bath" data-wall="south" title="Jih (dveře)">J</button>
-                <button class="wall-btn west primary"  data-room="bath" data-wall="west"  title="Západ (radiátor)">Z</button>
-                <button class="wall-btn east primary"  data-room="bath" data-wall="east"  title="Východ (umyvadlo)">V</button>
-                <div class="wall-center">Koupelna</div>
-              </div>
-            </div>
-            <div class="room-plan-block">
-              <div class="room-plan-label">WC <span>120×86</span></div>
-              <div class="wall-plan wc-plan" data-room="wc">
-                <button class="wall-btn north primary" data-room="wc" data-wall="north" title="Sever (dveře)">S</button>
-                <button class="wall-btn south primary" data-room="wc" data-wall="south" title="Jih (sdílená)">J</button>
-                <button class="wall-btn west primary"  data-room="wc" data-wall="west"  title="Západ (toaleta / Geberit)">Z</button>
-                <button class="wall-btn east primary"  data-room="wc" data-wall="east"  title="Východ">V</button>
-                <div class="wall-center">WC</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="wall-plan-legend">
-            <span><span class="legend-chip primary"></span>Primární</span>
-            <span><span class="legend-chip accent"></span>Akcent</span>
-          </div>
-          <p class="hint">Klikni stěnu pro přepnutí. Sdílená stěna má každou stranu nezávislou.</p>
         </div>
       </details>
 
@@ -2286,7 +2296,13 @@ function updateMetaLabels() {
   const el = id => document.getElementById(id);
   if (el("meta-floor"))  el("meta-floor").textContent  = `${fw}×${fh} mm`;
   if (el("meta-wall"))   el("meta-wall").textContent   = `${ww}×${wh} mm`;
-  if (el("meta-accent")) el("meta-accent").textContent = `${aw}×${ah} mm`;
+  if (el("meta-accent")) {
+    const accB = Object.values(config.bathWallSlots).filter(s => s === "accent").length;
+    const accW = Object.values(config.wcWallSlots).filter(s => s === "accent").length;
+    const total = accB + accW;
+    const usage = total ? `${total} stěn` : "žádné stěny";
+    el("meta-accent").textContent = `${aw}×${ah} mm · ${usage}`;
+  }
   if (el("meta-vanity")) el("meta-vanity").textContent = (VANITY_PRESETS[config.vanityFinish]?.label || "");
   if (el("meta-door"))   el("meta-door").textContent   = (VANITY_PRESETS[config.doorFinish]?.label   || "");
   if (el("meta-rooms"))  el("meta-rooms").textContent  =
@@ -2310,13 +2326,8 @@ function updateMetaLabels() {
     if (/Koupelna/i.test(lbl.textContent)) span.textContent = `${(config.bathW*100|0)}×${(config.bathD*100|0)}`;
     else if (/WC/i.test(lbl.textContent))  span.textContent = `${(config.wcW*100|0)}×${(config.wcD*100|0)}`;
   });
-  // Sumář akcentních stěn
-  if (el("meta-walls")) {
-    const accB = Object.values(config.bathWallSlots).filter(s => s === "accent").length;
-    const accW = Object.values(config.wcWallSlots).filter(s => s === "accent").length;
-    const total = accB + accW;
-    el("meta-walls").textContent = total ? `${total}× akcent` : "vše primární";
-  }
+  // meta-walls je teď podnadpis v rámci sekce Akcent — sumář se zobrazuje v hlavičce sekce.
+  if (el("meta-walls")) el("meta-walls").textContent = "";
 }
 
 function getFinishSwatchUrl(finishName) {
