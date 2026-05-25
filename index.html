@@ -534,16 +534,16 @@
           <div class="lib-grid" id="lib-accent"></div>
           <div class="row">
             <label>Rozměr</label>
-            <input type="number" id="accent-w" value="400" min="50">
+            <input type="number" id="accent-w" value="298" min="50">
             <span class="unit">×</span>
-            <input type="number" id="accent-h" value="200" min="50">
+            <input type="number" id="accent-h" value="298" min="50">
             <span class="unit">mm</span>
           </div>
           <div class="row">
             <label>Spára</label>
-            <input type="number" id="accent-grout-w" value="2" min="0" step="0.5">
+            <input type="number" id="accent-grout-w" value="3" min="0" step="0.5">
             <span class="unit">mm</span>
-            <input type="color" id="accent-grout-color" value="#d8d8d8" title="Barva spáry">
+            <input type="color" id="accent-grout-color" value="#bcbcbc" title="Barva spáry">
           </div>
           <div class="row">
             <label>Vazba</label>
@@ -561,6 +561,61 @@
               <option value="1.5707963267948966">Na výšku (90°)</option>
             </select>
           </div>
+        </div>
+      </details>
+
+      <details class="section">
+        <summary>
+          <span class="sec-icon">⌂</span>
+          <span class="sec-label">WC úpravy</span>
+          <span class="sec-meta" id="meta-wc-fit"></span>
+        </summary>
+        <div class="content">
+          <div class="row">
+            <label>Toaleta</label>
+            <select id="wc-geberit">
+              <option value="1" selected>Geberit (závěsná, předstěna)</option>
+              <option value="0">Klasická s nádržkou</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Předstěna</label>
+            <input type="number" id="wc-geberit-h" value="120" min="60" max="240">
+            <span class="unit">cm v.</span>
+            <input type="number" id="wc-geberit-d" value="20" min="10" max="40">
+            <span class="unit">cm hl.</span>
+          </div>
+          <div class="row">
+            <label>Obklad do</label>
+            <input type="number" id="wc-tile-h" value="120" min="60" max="280">
+            <span class="unit">cm</span>
+            <span style="flex:1; font-size:0.72rem; color:#6b7480;">nad bílý nátěr</span>
+          </div>
+          <p class="hint">Předstěna ukrývá Geberit nádržku a vede přes celou délku WC západní stěny. Po jejím vrcholu vzniká úzká polička.</p>
+        </div>
+      </details>
+
+      <details class="section">
+        <summary>
+          <span class="sec-icon">▮</span>
+          <span class="sec-label">Sprchový kout — akcent</span>
+          <span class="sec-meta" id="meta-shower"></span>
+        </summary>
+        <div class="content">
+          <div class="row">
+            <label>Pás</label>
+            <select id="shower-strip-mode">
+              <option value="off" selected>Vypnuto</option>
+              <option value="left">Vlevo (zadní stěna)</option>
+              <option value="right">Vpravo (boční stěna)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Šířka</label>
+            <input type="number" id="shower-strip-w" value="40" min="10" max="90">
+            <span class="unit">cm</span>
+          </div>
+          <p class="hint">Vertikální akcentní pás uvnitř sprchy v dekoru sekce „Akcent" (výchozí = podlahový vzor).</p>
         </div>
       </details>
 
@@ -663,16 +718,25 @@ const config = {
   wallBond: 0.5,
   wallRotation: 0,
   // Akcentní obklad – druhý "slot" obkladu, libovolně přiřaditelný na stěny
-  accentTileW: 0.40, accentTileH: 0.20,
-  accentGroutW: 0.002, accentGroutColor: "#d8d8d8",
+  // Výchozí rozměr odpovídá výchozímu vzoru (podlahový patchwork 298×298)
+  accentTileW: 0.298, accentTileH: 0.298,
+  accentGroutW: 0.003, accentGroutColor: "#bcbcbc",
   accentBond: 0,
   accentRotation: 0,
   // Přiřazení obkladů na stěny koupelny ("primary" | "accent")
   bathWallSlots: { north: "primary", south: "primary", east: "primary", west: "primary" },
-  // Přiřazení obkladů na stěny WC (south je sdílená s koupelnou – řízeno bathWallSlots.north)
+  // Přiřazení obkladů na stěny WC (každá strana sdílené stěny má vlastní volbu)
   wcWallSlots:   { north: "primary", south: "primary", east: "primary", west: "primary" },
   // Dekor umyvadlové skříňky
-  vanityFinish: "lightOak"
+  vanityFinish: "lightOak",
+  // WC úpravy
+  wcGeberitEnabled: true,        // Vestavný systém Geberit (předstěna 20 cm hloubka, 120 cm výška)
+  wcGeberitDepth: 0.20,
+  wcGeberitHeight: 1.20,
+  wcTileMaxHeight: 1.20,         // V WC obklad jen do této výšky (nad bílá omítka)
+  // Akcentní pás ve sprchovém koutu
+  showerStripMode: "off",        // "off" | "left" (zadní/severní stěna) | "right" (boční/východní stěna)
+  showerStripWidth: 0.40         // šířka pásu v metrech
 };
 
 const VANITY_PRESETS = {
@@ -1088,43 +1152,57 @@ function buildDoorPanel(parent, xCenter, zWall, facing, dw) {
   }
 }
 
-// Sink against south wall (z=0 local), basin extends in +Z direction
-function buildSmallSinkSouthWall(parent, xCenter, zWall) {
-  const w = 0.42, d = 0.30, top = 0.92;
+// Malé rohové umyvadlo v JV rohu WC (jih + východ).
+// xWall = pozice východní stěny (= ww), zWall = pozice jižní stěny (= 0)
+function buildCornerSinkSE(parent, xWall, zWall) {
+  // Rozměr umyvadla: šířka v ose X (od východní stěny), hloubka v ose Z (od jižní stěny)
+  const w = 0.30; // šířka (X)
+  const d = 0.24; // hloubka (Z)
+  const top = 0.85; // výška horní hrany umyvadla
+  const cx = xWall - w / 2;
   const cz = zWall + d / 2;
 
-  // Malá podumyvadlová skříňka v dekoru zvoleném pro koupelnové umyvadlo
-  const cabW = 0.42, cabD = 0.28, cabBaseY = 0.10, cabH = 0.74;
-  const cabTopY = cabBaseY + cabH; // 0.84 – přímo pod countertopem (sink top 0.92, deska 0.06 tlustá)
+  // Podumyvadlová skříňka v dekoru zvoleném pro koupelnové umyvadlo
+  const cabW = w, cabD = d - 0.02, cabBaseY = 0.08, cabH = 0.70;
+  const cabCx = xWall - cabW / 2;
   const cabCz = zWall + cabD / 2;
   const cabM = makeVanityMaterial();
-  box(parent, cabW, cabH, cabD, xCenter, cabBaseY + cabH / 2, cabCz, cabM);
-  // Šuplíková spára (vodorovná drážka 2/3 nahoře)
+  box(parent, cabW, cabH, cabD, cabCx, cabBaseY + cabH / 2, cabCz, cabM);
+
+  // Vodorovná drážka šuplíku
   box(parent, cabW + 0.002, 0.002, cabD + 0.002,
-      xCenter, cabBaseY + cabH * 0.65, cabCz,
+      cabCx, cabBaseY + cabH * 0.62, cabCz,
       mat({ color: 0x000000, roughness: 0.7 }));
-  // Úchytka uprostřed horní části
-  const handle = mat({ color: 0x222, metalness: 0.7, roughness: 0.3 });
-  box(parent, 0.14, 0.012, 0.012,
-      xCenter, cabBaseY + cabH * 0.80, cabCz + cabD / 2 + 0.006, handle);
+  // Úchytka na čelní straně skříňky (čelo je proti severu, +Z)
+  const handleM = mat({ color: 0x222, metalness: 0.7, roughness: 0.3 });
+  box(parent, 0.10, 0.012, 0.012,
+      cabCx, cabBaseY + cabH * 0.78, cabCz + cabD / 2 + 0.006,
+      handleM);
 
-  // Vrchní deska (countertop)
-  box(parent, w, 0.06, d, xCenter, top, cz, porcelain());
+  // Vrchní deska (countertop) – tenká bílá
+  box(parent, w, 0.04, d, cx, top, cz, porcelain());
 
-  // Umyvadlo
-  const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), porcelain());
-  bowl.position.set(xCenter, top, cz);
+  // Mísa umyvadla
+  const bowl = new THREE.Mesh(
+    new THREE.SphereGeometry(0.105, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    porcelain()
+  );
+  bowl.position.set(cx, top, cz);
   bowl.rotation.x = Math.PI;
   parent.add(bowl);
-  const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.14, 12), chrome());
-  tap.position.set(xCenter, top + 0.07, zWall + 0.06);
+
+  // Baterie – v rohu (na styku jih + východ), hadice u stěny
+  const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.14, 12), chrome());
+  tap.position.set(xWall - 0.05, top + 0.07, zWall + 0.05);
   parent.add(tap);
-  const spout = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.10), chrome());
-  spout.position.set(xCenter, top + 0.13, zWall + 0.10);
+  const spout = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.018, 0.018), chrome());
+  // Výtok směřuje k umyvadlu (do středu, tj. -X od baterie)
+  spout.position.set(xWall - 0.10, top + 0.13, zWall + 0.05);
   parent.add(spout);
 }
 
 // Toilet mounted on west wall (x=0 local), bowl extends in +X direction
+// Klasická varianta s nádržkou na stěně (bez Geberit)
 function buildToiletWestWall(parent, xWall, cz) {
   const pM = porcelain();
   // tank against west wall (depth 0.13 in X direction, width 0.4 in Z direction)
@@ -1148,6 +1226,80 @@ function buildToiletWestWall(parent, xWall, cz) {
   parent.add(bowl);
   box(parent, l - 0.05, 0.025, w - 0.03, xWall + 0.34, 0.43, cz, mat({ color: 0xfafafa, roughness: 0.3 }));
   box(parent, l - 0.05, 0.02, w - 0.02, xWall + 0.34, 0.46, cz, mat({ color: 0xfafafa, roughness: 0.3 }));
+}
+
+// Geberit – vestavná instalační předstěna podél západní stěny WC
+// + závěsná toaleta s ovládacím tlačítkem na čelní stěně
+function buildWCGeberit(parent, wd, h) {
+  const depth = config.wcGeberitDepth;   // 0.20 m do prostoru
+  const height = config.wcGeberitHeight; // 1.20 m vysoká předstěna
+  const xCenter = depth / 2;             // střed předstěny v ose X
+  const zCenter = wd / 2;                // přes celou délku WC západní stěny
+  const cz = wd * 0.50;                  // pozice toalety v ose Z
+
+  // Předstěna (zazděný systém) – obklad jako primární obklad WC západní stěny
+  const slot = config.wcWallSlots.west || "primary";
+  const faceM = makeWallMaterial(wd, height, slot);
+  const topM  = makeWallMaterial(depth, wd, slot); // pro horní hranu (police)
+  // Box geometrie: ix:[+X,-X,+Y,-Y,+Z,-Z] → +X face = čelní strana do WC
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(depth, height, wd),
+    [faceM, faceM, topM, faceM, faceM, faceM]
+  );
+  wall.position.set(xCenter, height / 2, zCenter);
+  wall.castShadow = true; wall.receiveShadow = true;
+  parent.add(wall);
+
+  // Spárová linie nahoře (zvýraznění předstěny jako police)
+  box(parent, depth + 0.002, 0.004, wd + 0.002,
+      xCenter, height + 0.002, zCenter,
+      mat({ color: 0xb8b8b8, roughness: 0.6 }));
+
+  // Závěsná WC mísa (extrudovaný oválný tvar)
+  const pM = porcelain();
+  const shape = new THREE.Shape();
+  const bw = 0.36, bl = 0.52;
+  shape.moveTo(-bw / 2, -bl / 2 + 0.05);
+  shape.lineTo(-bw / 2, bl / 2 - 0.10);
+  shape.quadraticCurveTo(-bw / 2, bl / 2, 0, bl / 2);
+  shape.quadraticCurveTo(bw / 2, bl / 2, bw / 2, bl / 2 - 0.10);
+  shape.lineTo(bw / 2, -bl / 2 + 0.05);
+  shape.quadraticCurveTo(0, -bl / 2, -bw / 2, -bl / 2 + 0.05);
+  const ext = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.32, bevelEnabled: true, bevelSize: 0.025, bevelThickness: 0.015, bevelSegments: 4
+  });
+  ext.rotateX(-Math.PI / 2);
+  ext.rotateY(Math.PI / 2);
+  const bowl = new THREE.Mesh(ext, pM);
+  // Mísa visí 40 cm nad podlahou; její zadní strana se opírá o předstěnu (x = depth)
+  bowl.position.set(depth + 0.18, 0.40, cz);
+  bowl.castShadow = true;
+  parent.add(bowl);
+
+  // Sedátko (oválná deska) a horní pevné prkénko
+  box(parent, bl - 0.05, 0.025, bw - 0.03, depth + 0.18, 0.43, cz,
+      mat({ color: 0xfafafa, roughness: 0.3 }));
+  box(parent, bl - 0.05, 0.02, bw - 0.02, depth + 0.18, 0.46, cz,
+      mat({ color: 0xfafafa, roughness: 0.3 }));
+
+  // Splachovací tlačítko na čelní straně předstěny – obdélníkový panel s 2 tlačítky
+  const btnY = 1.05; // ~95 cm nad podlahou
+  const plate = mat({ color: 0xeeeeee, metalness: 0.3, roughness: 0.4 });
+  const plateMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.005, 0.16, 0.22),
+    plate
+  );
+  plateMesh.position.set(depth + 0.0026, btnY, cz);
+  plateMesh.castShadow = true;
+  parent.add(plateMesh);
+
+  const btnM = mat({ color: 0xc8c8c8, metalness: 0.5, roughness: 0.3 });
+  const btnA = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.10, 0.08), btnM);
+  btnA.position.set(depth + 0.0055, btnY, cz - 0.05);
+  parent.add(btnA);
+  const btnB = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.10, 0.05), btnM);
+  btnB.position.set(depth + 0.0055, btnY, cz + 0.06);
+  parent.add(btnB);
 }
 
 // ---------- Build a room (rectangular) at world coords ----------
@@ -1197,6 +1349,47 @@ function buildRoomShell(parent, originX, originZ, w, d, h, walls, slots) {
 }
 
 // ---------- Furniture ----------
+
+// Vertikální akcentní pás uvnitř sprchového koutu (NE roh).
+// mode: "left" = na zadní (severní) stěně; "right" = na boční (východní) stěně.
+// Pás vyčnívá ~6 mm před stěnu, šířka stripWidth, výška od ~12 cm nad podlahou
+// do ~12 cm pod stropem (pro přirozený vzhled).
+function buildShowerAccentStrip(parent, w, d, h, mode, stripWidth) {
+  if (mode !== "left" && mode !== "right") return;
+  if (!accentCompositeTex) return;
+  const sz = 0.90; // velikost sprchové vaničky (ladí s buildShower)
+  const stripW = Math.max(0.10, Math.min(stripWidth || 0.40, sz));
+  const stripH = Math.max(0.40, h - 0.24); // 12 cm nad zemí + 12 cm pod stropem
+  const stripY = 0.12 + stripH / 2;
+  const offset = 0.006; // vyčnívání pásu před stěnou
+
+  if (mode === "left") {
+    // Na severní (zadní) stěně sprchy. Pás vodorovně blíž k vstupu do sprchy
+    // (na západní hraně sprchového koutu, tj. minimální x sprchy)
+    const xMin = w - sz;
+    const px = xMin + stripW / 2;
+    const m = makeWallMaterial(stripW, stripH, "accent");
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(stripW, stripH, 0.012),
+      m
+    );
+    mesh.position.set(px, stripY, d - offset);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    parent.add(mesh);
+  } else {
+    // Na východní (boční) stěně sprchy. Pás na jižní hraně sprchového koutu
+    const zMin = d - sz;
+    const pz = zMin + stripW / 2;
+    const m = makeWallMaterial(stripW, stripH, "accent");
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.012, stripH, stripW),
+      m
+    );
+    mesh.position.set(w - offset, stripY, pz);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    parent.add(mesh);
+  }
+}
 
 function buildShower(parent, w, d) {
   const sz = 0.90, tray = 0.06, gh = 1.92;
@@ -1510,6 +1703,7 @@ function rebuildScene() {
   registerDynamicWall(bathShell.walls.west,  cam => cam.x < bathOriginX);
 
   buildShower(bathRoom, bw, bd);
+  buildShowerAccentStrip(bathRoom, bw, bd, h, config.showerStripMode, config.showerStripWidth);
   buildVanityEastWall(bathRoom, bw, 0.10);
   buildWasher(bathRoom, 0.05, bd - 0.62);
   buildRadiator(bathRoom, 0, 0.10, Math.min(0.10 + 0.7, bd - 0.70));
@@ -1524,19 +1718,54 @@ function rebuildScene() {
   registerDynamicWall(wcShell.walls.east,  cam => cam.x > wcOriginX + ww);
   registerDynamicWall(wcShell.walls.west,  cam => cam.x < wcOriginX);
 
-  buildToiletWestWall(wcRoom, 0, wd * 0.55);
-  buildSmallSinkSouthWall(wcRoom, ww * 0.72, 0);
+  // Toaleta: buď klasická (s nádržkou), nebo závěsná Geberit s předstěnou
+  if (config.wcGeberitEnabled) {
+    buildWCGeberit(wcRoom, wd, h);
+  } else {
+    buildToiletWestWall(wcRoom, 0, wd * 0.55);
+  }
+  // Malé rohové umyvadlo v JV rohu
+  buildCornerSinkSE(wcRoom, ww, 0);
   buildDoorPanel(wcRoom, ww / 2, wd - 0.05, "north", 0.62);
 
   // Sdílená stěna mezi koupelnou a WC: jedna fyzická stěna, ale každá strana
   // má vlastní obklad. Bath.north = strana koupelny, WC.south = strana WC.
   applySharedWallMaterials(bathShell, bw, h);
 
+  // V WC obklad jen do dané výšky – nad bílá omítka
+  buildWCWhitePaintAbove(wcRoom, ww, wd, h, config.wcTileMaxHeight);
+
   const cx = bw / 2;
   const cz = (bd + T + wd) / 2;
   controls.target.set(cx, 1.0, cz);
 
   updateWallVisibility();
+}
+
+// Bílý nátěr na WC stěnách nad výškou obkladu.
+// Renderujeme jako tenké overlay panely zevnitř WC, které překryjí horní část obkladu.
+// Sdílená stěna i tři externí stěny WC dostanou bílý pruh nahoře.
+function buildWCWhitePaintAbove(parent, ww, wd, h, tileH) {
+  if (!Number.isFinite(tileH) || tileH >= h - 0.001) return; // nic nepřekrýt
+  const stripH = h - tileH;
+  const stripY = tileH + stripH / 2;
+  const offset = 0.005; // vrstva 5 mm dovnitř WC – stabilní bez z-fightingu
+  const T = 0.012; // tloušťka overlay panelu (čistě vizuální)
+  const paint = mat({ color: 0xfaf8f4, roughness: 0.85, metalness: 0 });
+
+  // Sever (zadní stěna WC): panel přilepený zevnitř na +Z stěnu, čelí směrem -Z
+  // (parent = wcRoom, lokální souřadnice 0..ww v X, 0..wd v Z)
+  box(parent, ww, stripH, T,
+      ww / 2, stripY, wd - offset - T / 2, paint);
+  // Jih (sdílená stěna): zevnitř WC = z=0, čelí směrem +Z
+  box(parent, ww, stripH, T,
+      ww / 2, stripY, offset + T / 2, paint);
+  // Západ (kde je toaleta): zevnitř WC, čelí směrem +X
+  box(parent, T, stripH, wd,
+      offset + T / 2, stripY, wd / 2, paint);
+  // Východ: zevnitř WC, čelí směrem -X
+  box(parent, T, stripH, wd,
+      ww - offset - T / 2, stripY, wd / 2, paint);
 }
 
 function applySharedWallMaterials(bathShell, w, h) {
@@ -1813,9 +2042,9 @@ function initDefaultLibraryEntries() {
   if (accentTileSource && !tileLibrary.accent.some(e => e.id === "default-accent")) {
     tileLibrary.accent.unshift({
       id: "default-accent",
-      name: "Bílý matný (výchozí)",
+      name: "Podlahový vzor (výchozí)",
       dataURL: sourceToDataURL(accentTileSource),
-      widthMm: 400, heightMm: 200, isDefault: true
+      widthMm: 298, heightMm: 298, isDefault: true
     });
   }
   // Default selections
@@ -1896,6 +2125,23 @@ function readConfigFromUI() {
   config.wcW   = room("wc-w",   config.wcW);
   config.wcD   = room("wc-d",   config.wcD);
   config.roomH = room("room-h", config.roomH);
+
+  // WC úpravy
+  const wcGel = document.getElementById("wc-geberit");
+  if (wcGel) config.wcGeberitEnabled = (wcGel.value === "1");
+  const cmRange = (id, lo, hi, fallback) => {
+    const v = num(id);
+    if (!Number.isFinite(v) || v < lo || v > hi) return fallback;
+    return v / 100;
+  };
+  config.wcGeberitHeight = cmRange("wc-geberit-h", 60, 240, Math.round(config.wcGeberitHeight * 100));
+  config.wcGeberitDepth  = cmRange("wc-geberit-d", 10, 40,  Math.round(config.wcGeberitDepth  * 100));
+  config.wcTileMaxHeight = cmRange("wc-tile-h",   60, 280, Math.round(config.wcTileMaxHeight * 100));
+
+  // Akcentní pás ve sprše
+  const stripModeEl = document.getElementById("shower-strip-mode");
+  if (stripModeEl) config.showerStripMode = stripModeEl.value;
+  config.showerStripWidth = cmRange("shower-strip-w", 10, 90, Math.round(config.showerStripWidth * 100));
 }
 
 function applyAndRebuild() {
@@ -1924,6 +2170,18 @@ function updateMetaLabels() {
   if (el("meta-vanity")) el("meta-vanity").textContent = (VANITY_PRESETS[config.vanityFinish]?.label || "");
   if (el("meta-rooms"))  el("meta-rooms").textContent  =
     `${(config.bathW*100|0)}×${(config.bathD*100|0)} · ${(config.wcW*100|0)}×${(config.wcD*100|0)} cm`;
+  if (el("meta-wc-fit")) {
+    const parts = [];
+    if (config.wcGeberitEnabled) parts.push(`Geberit ${(config.wcGeberitHeight*100)|0} cm`);
+    parts.push(`obklad do ${(config.wcTileMaxHeight*100)|0} cm`);
+    el("meta-wc-fit").textContent = parts.join(" · ");
+  }
+  if (el("meta-shower")) {
+    const m = config.showerStripMode;
+    if (m === "left")       el("meta-shower").textContent = `Pás vlevo · ${(config.showerStripWidth*100)|0} cm`;
+    else if (m === "right") el("meta-shower").textContent = `Pás vpravo · ${(config.showerStripWidth*100)|0} cm`;
+    else                    el("meta-shower").textContent = "Vypnuto";
+  }
   // Rozměry v hlavičkách plánů stěn
   document.querySelectorAll(".room-plan-label").forEach(lbl => {
     const span = lbl.querySelector("span");
@@ -2104,10 +2362,25 @@ async function loadDesign(file) {
     return;
   }
 
+  // Backward compat: starší uložené návrhy (před přidáním Geberit / akcent. pásu)
+  // neměly tyto klíče — pro takové soubory zachovej původní vzhled (bez novinek).
+  const legacy = data.config;
+  const hadGeberit = ("wcGeberitEnabled" in legacy);
+  const hadTileMaxH = ("wcTileMaxHeight" in legacy);
+  const hadShower   = ("showerStripMode" in legacy);
+
   // Merge config (zachovat defaulty pro chybějící klíče)
   Object.assign(config, data.config);
   if (data.config.bathWallSlots) config.bathWallSlots = { ...config.bathWallSlots, ...data.config.bathWallSlots };
   if (data.config.wcWallSlots)   config.wcWallSlots   = { ...config.wcWallSlots,   ...data.config.wcWallSlots };
+
+  // Pro starší soubory: vypnout novinky, aby vypadaly stejně jako před změnou
+  if (!hadGeberit)  config.wcGeberitEnabled = false;
+  if (!hadTileMaxH) config.wcTileMaxHeight = config.roomH; // tj. obklad přes celou výšku
+  if (!hadShower) {
+    config.showerStripMode  = "off";
+    config.showerStripWidth = 0.40;
+  }
 
   // Načíst obrázky obkladů
   if (data.images?.floor)  floorTileSource  = await dataURLToImage(data.images.floor).catch(() => floorTileSource);
@@ -2153,6 +2426,12 @@ function syncUIFromConfig() {
   setVal("wc-w",   Math.round(config.wcW   * 100));
   setVal("wc-d",   Math.round(config.wcD   * 100));
   setVal("room-h", Math.round(config.roomH * 100));
+  setVal("wc-geberit",   config.wcGeberitEnabled ? "1" : "0");
+  setVal("wc-geberit-h", Math.round(config.wcGeberitHeight * 100));
+  setVal("wc-geberit-d", Math.round(config.wcGeberitDepth  * 100));
+  setVal("wc-tile-h",    Math.round(config.wcTileMaxHeight * 100));
+  setVal("shower-strip-mode", config.showerStripMode || "off");
+  setVal("shower-strip-w",    Math.round((config.showerStripWidth || 0.40) * 100));
 
   // Sync wall plan buttons
   document.querySelectorAll(".wall-plan .wall-btn[data-wall]").forEach(btn => {
@@ -2182,8 +2461,10 @@ function setupUI() {
 
   // Selects — immediate apply on change
   ["floor-bond", "floor-direction", "wall-bond", "wall-direction",
-   "accent-bond", "accent-direction"].forEach(id => {
-    document.getElementById(id).addEventListener("change", applyAndRebuild);
+   "accent-bond", "accent-direction",
+   "wc-geberit", "shower-strip-mode"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", applyAndRebuild);
   });
 
   // Number inputs and color pickers — debounced apply
@@ -2191,8 +2472,10 @@ function setupUI() {
    "wall-w",  "wall-h",  "wall-grout-w",
    "accent-w","accent-h","accent-grout-w",
    "bath-w",  "bath-d",  "wc-w", "wc-d", "room-h",
+   "wc-geberit-h", "wc-geberit-d", "wc-tile-h", "shower-strip-w",
    "floor-grout-color", "wall-grout-color", "accent-grout-color"].forEach(id => {
-    document.getElementById(id).addEventListener("input", debouncedApply);
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", debouncedApply);
   });
 
   setupFinishGrid();
@@ -2235,7 +2518,8 @@ async function init() {
   const defaultImg = await loadDefaultFloorImage();
   floorTileSource = defaultImg || makeProceduralFloorCanvas();
   wallTileSource  = makeProceduralWallCanvas();
-  accentTileSource = makeProceduralWallCanvas();
+  // Akcentní obklad používá ve výchozím stavu stejný vzor jako podlaha (geometrický patchwork)
+  accentTileSource = floorTileSource;
 
   rebuildFloorTexture();
   rebuildWallTexture();
