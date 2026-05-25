@@ -298,21 +298,28 @@
     }
 
     /* Wall plans */
+    .wall-plans-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .room-plan-block { display: flex; flex-direction: column; gap: 4px; }
     .room-plan-label {
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 0.74rem; color: #4a5460; font-weight: 600;
-      margin: 4px 0 4px;
+      display: flex; align-items: baseline; justify-content: space-between;
+      font-size: 0.72rem; color: #4a5460; font-weight: 600;
+      gap: 4px;
     }
     .room-plan-label span {
       color: #98a0a8; font-weight: 400; font-variant-numeric: tabular-nums;
+      font-size: 0.66rem;
     }
     .wall-plan {
       position: relative;
       width: 100%;
       aspect-ratio: 166/164;
       background: #f5f6f8;
-      border-radius: 8px;
-      margin: 0 0 10px;
+      border-radius: 6px;
       user-select: none;
     }
     .wall-plan.wc-plan { aspect-ratio: 120/86; }
@@ -321,7 +328,7 @@
       background: #d6dadf;
       cursor: pointer; border: none; padding: 0;
       transition: background 0.15s, transform 0.1s;
-      font-size: 0.65rem; color: #475569; font-weight: 600;
+      font-size: 0.58rem; color: #475569; font-weight: 700;
       display: flex; align-items: center; justify-content: center;
     }
     .wall-plan .wall-btn:hover { background: #b8bec5; }
@@ -348,39 +355,34 @@
       #eef1f4 4px, #eef1f4 8px
     ); }
     .wall-plan .wall-btn.north {
-      top: 0; left: 0; right: 0; height: 18%;
-      border-radius: 8px 8px 0 0;
+      top: 0; left: 0; right: 0; height: 22%;
+      border-radius: 6px 6px 0 0;
     }
     .wall-plan .wall-btn.south {
-      bottom: 0; left: 0; right: 0; height: 18%;
-      border-radius: 0 0 8px 8px;
+      bottom: 0; left: 0; right: 0; height: 22%;
+      border-radius: 0 0 6px 6px;
     }
     .wall-plan .wall-btn.west {
-      top: 18%; bottom: 18%; left: 0; width: 18%;
+      top: 22%; bottom: 22%; left: 0; width: 22%;
     }
     .wall-plan .wall-btn.east {
-      top: 18%; bottom: 18%; right: 0; width: 18%;
+      top: 22%; bottom: 22%; right: 0; width: 22%;
     }
     .wall-plan .wall-center {
-      position: absolute; inset: 20%;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
+      position: absolute; inset: 23%;
+      display: flex; align-items: center; justify-content: center;
       pointer-events: none;
-      color: #5a6470; font-size: 0.74rem; font-weight: 600;
+      color: #5a6470; font-size: 0.62rem; font-weight: 600;
       text-align: center;
       background: #fff;
-      border-radius: 5px;
-      gap: 2px;
-    }
-    .wall-plan .wall-center small {
-      font-size: 0.68rem; color: #98a0a8; font-weight: 400;
+      border-radius: 3px;
     }
     .wall-plan-legend {
-      display: flex; align-items: center; gap: 14px;
-      font-size: 0.74rem; color: #5a6470;
+      display: flex; align-items: center; gap: 12px;
+      font-size: 0.7rem; color: #5a6470;
     }
     .legend-chip {
-      display: inline-block; width: 14px; height: 10px; border-radius: 2px;
+      display: inline-block; width: 12px; height: 9px; border-radius: 2px;
       vertical-align: middle; margin-right: 5px;
     }
     .legend-chip.primary { background: #d6dadf; }
@@ -619,35 +621,41 @@
         </div>
       </details>
 
-      <details class="section" open>
+      <details class="section">
         <summary>
           <span class="sec-icon">⊞</span>
           <span class="sec-label">Stěny</span>
+          <span class="sec-meta" id="meta-walls"></span>
         </summary>
         <div class="content">
-          <div class="room-plan-label">Koupelna <span>166 × 164</span></div>
-          <div class="wall-plan" data-room="bath">
-            <button class="wall-btn north primary" data-room="bath" data-wall="north" title="Severní stěna (sprcha)">S</button>
-            <button class="wall-btn south primary" data-room="bath" data-wall="south" title="Jižní stěna (dveře)">J</button>
-            <button class="wall-btn west primary"  data-room="bath" data-wall="west"  title="Západní stěna (radiátor)">Z</button>
-            <button class="wall-btn east primary"  data-room="bath" data-wall="east"  title="Východní stěna (umyvadlo)">V</button>
-            <div class="wall-center">Koupelna<small>klikni stěnu</small></div>
-          </div>
-
-          <div class="room-plan-label">WC <span>120 × 86</span></div>
-          <div class="wall-plan wc-plan" data-room="wc">
-            <button class="wall-btn north primary" data-room="wc" data-wall="north" title="Severní stěna (dveře)">S</button>
-            <button class="wall-btn south primary" data-room="wc" data-wall="south" title="Jižní stěna — vnitřní strana sdílené stěny s koupelnou">J</button>
-            <button class="wall-btn west primary"  data-room="wc" data-wall="west"  title="Západní stěna (toaleta)">Z</button>
-            <button class="wall-btn east primary"  data-room="wc" data-wall="east"  title="Východní stěna">V</button>
-            <div class="wall-center">WC<small>klikni stěnu</small></div>
+          <div class="wall-plans-grid">
+            <div class="room-plan-block">
+              <div class="room-plan-label">Koupelna <span>166×164</span></div>
+              <div class="wall-plan" data-room="bath">
+                <button class="wall-btn north primary" data-room="bath" data-wall="north" title="Sever (sprcha)">S</button>
+                <button class="wall-btn south primary" data-room="bath" data-wall="south" title="Jih (dveře)">J</button>
+                <button class="wall-btn west primary"  data-room="bath" data-wall="west"  title="Západ (radiátor)">Z</button>
+                <button class="wall-btn east primary"  data-room="bath" data-wall="east"  title="Východ (umyvadlo)">V</button>
+                <div class="wall-center">Koupelna</div>
+              </div>
+            </div>
+            <div class="room-plan-block">
+              <div class="room-plan-label">WC <span>120×86</span></div>
+              <div class="wall-plan wc-plan" data-room="wc">
+                <button class="wall-btn north primary" data-room="wc" data-wall="north" title="Sever (dveře)">S</button>
+                <button class="wall-btn south primary" data-room="wc" data-wall="south" title="Jih (sdílená)">J</button>
+                <button class="wall-btn west primary"  data-room="wc" data-wall="west"  title="Západ (toaleta / Geberit)">Z</button>
+                <button class="wall-btn east primary"  data-room="wc" data-wall="east"  title="Východ">V</button>
+                <div class="wall-center">WC</div>
+              </div>
+            </div>
           </div>
 
           <div class="wall-plan-legend">
             <span><span class="legend-chip primary"></span>Primární</span>
             <span><span class="legend-chip accent"></span>Akcent</span>
           </div>
-          <p class="hint">Sdílená stěna mezi koupelnou a WC má každou stranu nezávislou (Sever koupelny / Jih WC).</p>
+          <p class="hint">Klikni stěnu pro přepnutí. Sdílená stěna má každou stranu nezávislou.</p>
         </div>
       </details>
 
@@ -660,6 +668,18 @@
         <div class="content">
           <div class="finish-grid" id="finish-grid"></div>
           <div class="finish-label" id="finish-label">Světlý dub</div>
+        </div>
+      </details>
+
+      <details class="section">
+        <summary>
+          <span class="sec-icon">▢</span>
+          <span class="sec-label">Dveře</span>
+          <span class="sec-meta" id="meta-door"></span>
+        </summary>
+        <div class="content">
+          <div class="finish-grid" id="door-finish-grid"></div>
+          <div class="finish-label" id="door-finish-label">Bílá matná</div>
         </div>
       </details>
 
@@ -726,9 +746,12 @@ const config = {
   // Přiřazení obkladů na stěny koupelny ("primary" | "accent")
   bathWallSlots: { north: "primary", south: "primary", east: "primary", west: "primary" },
   // Přiřazení obkladů na stěny WC (každá strana sdílené stěny má vlastní volbu)
-  wcWallSlots:   { north: "primary", south: "primary", east: "primary", west: "primary" },
+  // Západ = stěna za WC (Geberit / nebo plná stěna) — výchozí akcent (= podlahový vzor)
+  wcWallSlots:   { north: "primary", south: "primary", east: "primary", west: "accent" },
   // Dekor umyvadlové skříňky
   vanityFinish: "lightOak",
+  // Dekor dveří (stejné možnosti jako skříňka)
+  doorFinish: "whiteMatte",
   // WC úpravy
   wcGeberitEnabled: true,        // Vestavný systém Geberit (předstěna 20 cm hloubka, 120 cm výška)
   wcGeberitDepth: 0.20,
@@ -1035,14 +1058,25 @@ function makeWoodTex(hues) {
 // Default wood for door panels
 const woodTex = makeWoodTex();
 
-function makeVanityMaterial() {
-  const preset = VANITY_PRESETS[config.vanityFinish] || VANITY_PRESETS.lightOak;
+// Společný factory pro materiál podle finish presetu (skříňka / dveře / atd.)
+function makeFinishMaterial(finishKey, opts) {
+  const preset = VANITY_PRESETS[finishKey] || VANITY_PRESETS.whiteMatte;
+  const o = opts || {};
   if (preset.kind === "wood") {
     const t = makeWoodTex(preset.hues);
-    t.repeat.set(1, 1);
+    t.repeat.set(o.repeatX || 1, o.repeatY || 1);
     return mat({ map: t, roughness: 0.65, envMapIntensity: 0.6 });
   }
   return mat({ color: preset.color, roughness: preset.roughness, metalness: 0.04, envMapIntensity: 0.7 });
+}
+
+function makeVanityMaterial() {
+  return makeFinishMaterial(config.vanityFinish || "lightOak");
+}
+
+function makeDoorMaterial() {
+  // U dveří dává smysl protáhlý vzor (vyšší repeat ve vertikálním směru u dřeva)
+  return makeFinishMaterial(config.doorFinish || "whiteMatte", { repeatY: 2 });
 }
 
 // ---------- Helpers ----------
@@ -1106,11 +1140,12 @@ function makeGroutPlane(w, h) {
 function buildDoorPanel(parent, xCenter, zWall, facing, dw) {
   // facing: "south" = door faces -Z (opens south), "north" = +Z, "east" = +X, "west" = -X
   const dh = 2.05, frameT = 0.04;
-  const wd = woodTex.clone();
-  wd.repeat.set(1, 2);
-  wd.needsUpdate = true;
-  const woodM = mat({ map: wd, roughness: 0.7 });
-  const frameM = mat({ color: 0xeeeeee, roughness: 0.6 });
+  const woodM = makeDoorMaterial();
+  // Rám se ladí s plochou dveří – pokud jsou dveře barevné, rám je o trochu světlejší/tmavší.
+  // U bílých dveří je rám čistá bílá. U dřevěných stejný rám jako dříve (světle šedá).
+  const doorPreset = VANITY_PRESETS[config.doorFinish] || VANITY_PRESETS.whiteMatte;
+  const frameColor = doorPreset.kind === "wood" ? 0xeeeeee : 0xf6f6f6;
+  const frameM = mat({ color: frameColor, roughness: 0.6 });
 
   let dx, dy, dz, doorBoxW, doorBoxD;
   if (facing === "south" || facing === "north") {
@@ -2253,6 +2288,7 @@ function updateMetaLabels() {
   if (el("meta-wall"))   el("meta-wall").textContent   = `${ww}×${wh} mm`;
   if (el("meta-accent")) el("meta-accent").textContent = `${aw}×${ah} mm`;
   if (el("meta-vanity")) el("meta-vanity").textContent = (VANITY_PRESETS[config.vanityFinish]?.label || "");
+  if (el("meta-door"))   el("meta-door").textContent   = (VANITY_PRESETS[config.doorFinish]?.label   || "");
   if (el("meta-rooms"))  el("meta-rooms").textContent  =
     `${(config.bathW*100|0)}×${(config.bathD*100|0)} · ${(config.wcW*100|0)}×${(config.wcD*100|0)} cm`;
   if (el("meta-wc-fit")) {
@@ -2271,9 +2307,16 @@ function updateMetaLabels() {
   document.querySelectorAll(".room-plan-label").forEach(lbl => {
     const span = lbl.querySelector("span");
     if (!span) return;
-    if (/Koupelna/i.test(lbl.textContent)) span.textContent = `${(config.bathW*100|0)} × ${(config.bathD*100|0)} cm`;
-    else if (/WC/i.test(lbl.textContent))  span.textContent = `${(config.wcW*100|0)} × ${(config.wcD*100|0)} cm`;
+    if (/Koupelna/i.test(lbl.textContent)) span.textContent = `${(config.bathW*100|0)}×${(config.bathD*100|0)}`;
+    else if (/WC/i.test(lbl.textContent))  span.textContent = `${(config.wcW*100|0)}×${(config.wcD*100|0)}`;
   });
+  // Sumář akcentních stěn
+  if (el("meta-walls")) {
+    const accB = Object.values(config.bathWallSlots).filter(s => s === "accent").length;
+    const accW = Object.values(config.wcWallSlots).filter(s => s === "accent").length;
+    const total = accB + accW;
+    el("meta-walls").textContent = total ? `${total}× akcent` : "vše primární";
+  }
 }
 
 function getFinishSwatchUrl(finishName) {
@@ -2296,8 +2339,13 @@ function getFinishSwatchUrl(finishName) {
   return c.toDataURL();
 }
 
-function setupFinishGrid() {
-  const grid = document.getElementById("finish-grid");
+// Univerzální setup mřížky finish swatches – použitelné pro skříňku i dveře.
+// Args: { gridId, labelId, configKey } – configKey je název klíče v `config`,
+//        např. "vanityFinish" / "doorFinish".
+function setupFinishGridFor(args) {
+  const { gridId, labelId, configKey } = args;
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
   grid.innerHTML = "";
   Object.entries(VANITY_PRESETS).forEach(([key, preset]) => {
     const btn = document.createElement("button");
@@ -2305,18 +2353,27 @@ function setupFinishGrid() {
     btn.title = preset.label;
     btn.style.backgroundImage = `url(${getFinishSwatchUrl(key)})`;
     btn.dataset.finish = key;
-    if (key === config.vanityFinish) btn.classList.add("selected");
+    if (key === config[configKey]) btn.classList.add("selected");
     btn.addEventListener("click", () => {
-      config.vanityFinish = key;
+      config[configKey] = key;
       grid.querySelectorAll(".finish-swatch").forEach(b =>
         b.classList.toggle("selected", b.dataset.finish === key));
-      document.getElementById("finish-label").textContent = preset.label;
+      const lbl = document.getElementById(labelId);
+      if (lbl) lbl.textContent = preset.label;
       applyAndRebuild();
     });
     grid.appendChild(btn);
   });
-  const initial = VANITY_PRESETS[config.vanityFinish];
-  if (initial) document.getElementById("finish-label").textContent = initial.label;
+  const initial = VANITY_PRESETS[config[configKey]];
+  if (initial) {
+    const lbl = document.getElementById(labelId);
+    if (lbl) lbl.textContent = initial.label;
+  }
+}
+
+function setupFinishGrid() {
+  setupFinishGridFor({ gridId: "finish-grid",      labelId: "finish-label",      configKey: "vanityFinish" });
+  setupFinishGridFor({ gridId: "door-finish-grid", labelId: "door-finish-label", configKey: "doorFinish" });
 }
 
 function setupWallPlan() {
@@ -2466,6 +2523,8 @@ async function loadDesign(file) {
     config.showerStripMode  = "off";
     config.showerStripWidth = 0.40;
   }
+  // Starší saves neměly doorFinish – dveře byly natvrdo přírodní dub.
+  if (!("doorFinish" in legacy)) config.doorFinish = "naturalOak";
 
   // Načíst obrázky obkladů
   if (data.images?.floor)  floorTileSource  = await dataURLToImage(data.images.floor).catch(() => floorTileSource);
@@ -2533,6 +2592,11 @@ function syncUIFromConfig() {
     b.classList.toggle("selected", b.dataset.finish === config.vanityFinish));
   const fl = document.getElementById("finish-label");
   if (fl && VANITY_PRESETS[config.vanityFinish]) fl.textContent = VANITY_PRESETS[config.vanityFinish].label;
+  // Sync door finish selection
+  document.querySelectorAll("#door-finish-grid .finish-swatch").forEach(b =>
+    b.classList.toggle("selected", b.dataset.finish === config.doorFinish));
+  const dfl = document.getElementById("door-finish-label");
+  if (dfl && VANITY_PRESETS[config.doorFinish]) dfl.textContent = VANITY_PRESETS[config.doorFinish].label;
 }
 
 function setActiveViewButton(view) {
