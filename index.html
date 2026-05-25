@@ -308,6 +308,10 @@
     .legend-chip.accent { background: linear-gradient(135deg, #d4a574 0%, #b88a55 100%); }
     .legend-chip.shared { background: repeating-linear-gradient(
       135deg, #e4e8ed 0px, #e4e8ed 3px, #eef1f4 3px, #eef1f4 6px); }
+    .hint {
+      font-size: 0.72rem; color: #6b7480;
+      margin-top: 8px; line-height: 1.35;
+    }
 
     /* Loading */
     #loading {
@@ -503,7 +507,7 @@
           <div class="room-plan-label">WC <span>120 × 86</span></div>
           <div class="wall-plan wc-plan" data-room="wc">
             <button class="wall-btn north primary" data-room="wc" data-wall="north" title="Severní stěna (dveře)">S</button>
-            <div class="wall-btn south shared" title="Sdílená stěna s koupelnou – řídí se severní stěnou koupelny">sdílená</div>
+            <button class="wall-btn south primary" data-room="wc" data-wall="south" title="Jižní stěna — vnitřní strana sdílené stěny s koupelnou">J</button>
             <button class="wall-btn west primary"  data-room="wc" data-wall="west"  title="Západní stěna (toaleta)">Z</button>
             <button class="wall-btn east primary"  data-room="wc" data-wall="east"  title="Východní stěna">V</button>
             <div class="wall-center">WC<small>klikni stěnu</small></div>
@@ -512,8 +516,8 @@
           <div class="wall-plan-legend">
             <span><span class="legend-chip primary"></span>Primární</span>
             <span><span class="legend-chip accent"></span>Akcent</span>
-            <span><span class="legend-chip shared"></span>Sdílená</span>
           </div>
+          <p class="hint">Sdílená stěna mezi koupelnou a WC má každou stranu nezávislou (Sever koupelny / Jih WC).</p>
         </div>
       </details>
 
@@ -1449,11 +1453,32 @@ function rebuildScene() {
   buildSmallSinkSouthWall(wcRoom, ww * 0.72, 0);
   buildDoorPanel(wcRoom, ww / 2, wd - 0.05, "north", 0.62);
 
+  // Sdílená stěna mezi koupelnou a WC: jedna fyzická stěna, ale každá strana
+  // má vlastní obklad. Bath.north = strana koupelny, WC.south = strana WC.
+  applySharedWallMaterials(bathShell, bw, h);
+
   const cx = bw / 2;
   const cz = (bd + T + wd) / 2;
   controls.target.set(cx, 1.0, cz);
 
   updateWallVisibility();
+}
+
+function applySharedWallMaterials(bathShell, w, h) {
+  const sharedWall = bathShell.walls.north;
+  if (!sharedWall) return;
+  // Uvolnit původní jednoduchý materiál
+  const old = sharedWall.material;
+  if (Array.isArray(old)) old.forEach(m => m && m.dispose && m.dispose());
+  else if (old && old.dispose) old.dispose();
+
+  const matBath = makeWallMaterial(w, h, config.bathWallSlots.north);
+  const matWc   = makeWallMaterial(w, h, config.wcWallSlots.south);
+  const neutral = mat({ color: 0xefefef, roughness: 0.7 });
+  // BoxGeometry faces order: [+X, -X, +Y, -Y, +Z, -Z]
+  //   −Z face (index 5) směřuje na jih → do koupelny
+  //   +Z face (index 4) směřuje na sever → do WC
+  sharedWall.material = [neutral, neutral, neutral, neutral, matWc, matBath];
 }
 
 function registerDynamicWall(mesh, shouldHide) {
