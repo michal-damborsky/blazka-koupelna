@@ -1070,8 +1070,10 @@ function buildShower(parent, w, d) {
   parent.add(drain);
 
   const glassM = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, transparent: true, opacity: 0.18,
-    roughness: 0.02, metalness: 0, transmission: 0.92, thickness: 0.015,
+    color: 0xffffff, transparent: true, opacity: 0.16,
+    roughness: 0.12, metalness: 0,
+    transmission: 0.86, thickness: 0.015,
+    envMapIntensity: 0.45,
     side: THREE.DoubleSide
   });
   const shape = new THREE.Shape();
@@ -1240,7 +1242,7 @@ function buildRadiator(parent, x, z0, z1) {
   // Koupelnový žebřík: 2 vertikální postranní sloupky + horizontální žebra mezi nimi
   const rM = mat({ color: 0xffffff, metalness: 0.3, roughness: 0.4 });
   const xCenter = x + 0.06;
-  const yBottom = 0.10, yTop = 1.30;
+  const yBottom = 0.32, yTop = 1.55;
   const height = yTop - yBottom;
   const length = z1 - z0;
 
@@ -1267,8 +1269,8 @@ function buildRadiator(parent, x, z0, z1) {
   }
 
   // Nástěnné držáky a chromované přípojky vody
-  box(parent, 0.04, 0.04, 0.06, x + 0.025, 0.30, z0 - 0.04, chrome());
-  box(parent, 0.04, 0.04, 0.06, x + 0.025, 1.10, z1 + 0.04, chrome());
+  box(parent, 0.04, 0.04, 0.06, x + 0.025, yBottom + 0.18, z0 - 0.04, chrome());
+  box(parent, 0.04, 0.04, 0.06, x + 0.025, yTop - 0.18, z1 + 0.04, chrome());
 }
 
 function buildToiletWC(parent, cx, zWall) {
