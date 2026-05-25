@@ -35,6 +35,30 @@
     .btn.primary:hover { background: #4a8060; border-color: #4a8060; }
     .btn.ghost { background: transparent; border-color: transparent; }
     .btn.ghost:hover { background: #eef1f5; }
+    .btn.active { background: #3d6b4f; color: #fff; border-color: #3d6b4f; }
+    .btn-group {
+      display: inline-flex;
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid #d4d8df;
+      background: #fff;
+    }
+    .btn-group .btn {
+      border: 0;
+      border-right: 1px solid #e1e4e9;
+      border-radius: 0;
+      padding: 7px 11px;
+    }
+    .btn-group .btn:last-child { border-right: 0; }
+    .btn-group .btn.active {
+      background: #3d6b4f; color: #fff;
+    }
+    .btn-group .btn:not(.active):hover { background: #f3f5f8; }
+    .toolbar-divider {
+      width: 1px; height: 22px;
+      background: #d4d8df;
+      margin: 0 4px;
+    }
     #legend { margin-left: auto; font-size: 0.78rem; color: #6b7480; font-variant-numeric: tabular-nums; }
     #canvas-container { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; }
 
@@ -335,11 +359,22 @@
   <div id="loading">Načítám 3D scénu…</div>
   <header id="toolbar">
     <h1>Rekonstrukce – Koupelna + WC</h1>
-    <button class="btn" id="btn-toggle">Nastavení</button>
-    <button class="btn" id="btn-top">Půdorys</button>
-    <button class="btn" id="btn-bath">Koupelna</button>
-    <button class="btn" id="btn-wc">WC</button>
-    <button class="btn primary" id="btn-reset">Reset</button>
+    <button class="btn" id="btn-toggle" title="Skrýt/zobrazit panel nastavení">Panel</button>
+
+    <div class="btn-group" role="tablist" aria-label="Pohled">
+      <button class="btn" id="btn-reset" data-view="default">Vše</button>
+      <button class="btn" id="btn-top" data-view="top">Půdorys</button>
+      <button class="btn" id="btn-bath" data-view="bath">Koupelna</button>
+      <button class="btn" id="btn-wc" data-view="wc">WC</button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <button class="btn" id="btn-screenshot" title="Stáhnout aktuální pohled jako PNG">Snímek</button>
+    <button class="btn" id="btn-save" title="Uložit aktuální návrh do souboru">Uložit</button>
+    <button class="btn" id="btn-load" title="Načíst návrh ze souboru">Načíst</button>
+    <input type="file" id="file-load" accept="application/json,.json" style="display:none">
+
     <span id="legend"></span>
   </header>
 
@@ -626,7 +661,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xe6eaf0);
 
 const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 60);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1736,6 +1771,157 @@ function setupWallPlan() {
   });
 }
 
+// ---------- Screenshot ----------
+
+function downloadDataUrl(dataUrl, filename) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function takeScreenshot() {
+  // Vyrenderovat aktuální snímek (preserveDrawingBuffer není zapnut – render musí proběhnout teď)
+  renderer.render(scene, camera);
+  renderer.domElement.toBlob(blob => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    downloadDataUrl(url, `koupelna-${ts}.png`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, "image/png");
+}
+
+// ---------- Save / Load design ----------
+
+function sourceToDataURL(source) {
+  if (!source) return null;
+  if (source instanceof HTMLCanvasElement) return source.toDataURL("image/png");
+  if (source instanceof HTMLImageElement) {
+    const c = document.createElement("canvas");
+    c.width = source.naturalWidth || source.width || 512;
+    c.height = source.naturalHeight || source.height || 512;
+    c.getContext("2d").drawImage(source, 0, 0);
+    return c.toDataURL("image/png");
+  }
+  return null;
+}
+
+function dataURLToImage(dataURL) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataURL;
+  });
+}
+
+function saveDesign() {
+  const data = {
+    version: 1,
+    timestamp: new Date().toISOString(),
+    config: JSON.parse(JSON.stringify(config)),
+    images: {
+      floor:  sourceToDataURL(floorTileSource),
+      wall:   sourceToDataURL(wallTileSource),
+      accent: sourceToDataURL(accentTileSource)
+    }
+  };
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  downloadDataUrl(url, `koupelna-navrh-${ts}.json`);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function loadDesign(file) {
+  let data;
+  try {
+    const text = await file.text();
+    data = JSON.parse(text);
+  } catch (e) {
+    alert("Nepodařilo se přečíst soubor návrhu.");
+    return;
+  }
+  if (!data || !data.config) {
+    alert("Soubor nemá očekávaný formát.");
+    return;
+  }
+
+  // Merge config (zachovat defaulty pro chybějící klíče)
+  Object.assign(config, data.config);
+  if (data.config.bathWallSlots) config.bathWallSlots = { ...config.bathWallSlots, ...data.config.bathWallSlots };
+  if (data.config.wcWallSlots)   config.wcWallSlots   = { ...config.wcWallSlots,   ...data.config.wcWallSlots };
+
+  // Načíst obrázky obkladů
+  if (data.images?.floor)  floorTileSource  = await dataURLToImage(data.images.floor).catch(() => floorTileSource);
+  if (data.images?.wall)   wallTileSource   = await dataURLToImage(data.images.wall).catch(() => wallTileSource);
+  if (data.images?.accent) accentTileSource = await dataURLToImage(data.images.accent).catch(() => accentTileSource);
+
+  syncUIFromConfig();
+  setSwatch("sw-floor",  floorTileSource);
+  setSwatch("sw-wall",   wallTileSource);
+  setSwatch("sw-accent", accentTileSource);
+
+  rebuildFloorTexture();
+  rebuildWallTexture();
+  rebuildAccentTexture();
+  rebuildScene();
+  updateLegend();
+  updateMetaLabels();
+}
+
+function syncUIFromConfig() {
+  const setVal = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+  setVal("floor-w", Math.round(config.floorTileW * 1000));
+  setVal("floor-h", Math.round(config.floorTileH * 1000));
+  setVal("floor-grout-w", +(config.floorGroutW * 1000).toFixed(2));
+  setVal("floor-grout-color", config.floorGroutColor);
+  setVal("floor-bond", String(config.floorBond));
+  setVal("floor-direction", String(config.floorRotation));
+  setVal("wall-w", Math.round(config.wallTileW * 1000));
+  setVal("wall-h", Math.round(config.wallTileH * 1000));
+  setVal("wall-grout-w", +(config.wallGroutW * 1000).toFixed(2));
+  setVal("wall-grout-color", config.wallGroutColor);
+  setVal("wall-bond", String(config.wallBond));
+  setVal("wall-direction", String(config.wallRotation));
+  setVal("accent-w", Math.round(config.accentTileW * 1000));
+  setVal("accent-h", Math.round(config.accentTileH * 1000));
+  setVal("accent-grout-w", +(config.accentGroutW * 1000).toFixed(2));
+  setVal("accent-grout-color", config.accentGroutColor);
+  setVal("accent-bond", String(config.accentBond));
+  setVal("accent-direction", String(config.accentRotation));
+  setVal("bath-w", Math.round(config.bathW * 100));
+  setVal("bath-d", Math.round(config.bathD * 100));
+  setVal("wc-w",   Math.round(config.wcW   * 100));
+  setVal("wc-d",   Math.round(config.wcD   * 100));
+  setVal("room-h", Math.round(config.roomH * 100));
+
+  // Sync wall plan buttons
+  document.querySelectorAll(".wall-plan .wall-btn[data-wall]").forEach(btn => {
+    if (btn.classList.contains("shared")) return;
+    const room = btn.dataset.room;
+    const dir = btn.dataset.wall;
+    const slot = (room === "wc" ? config.wcWallSlots : config.bathWallSlots)[dir];
+    btn.classList.toggle("accent", slot === "accent");
+    btn.classList.toggle("primary", slot !== "accent");
+  });
+
+  // Sync vanity finish selection
+  document.querySelectorAll("#finish-grid .finish-swatch").forEach(b =>
+    b.classList.toggle("selected", b.dataset.finish === config.vanityFinish));
+  const fl = document.getElementById("finish-label");
+  if (fl && VANITY_PRESETS[config.vanityFinish]) fl.textContent = VANITY_PRESETS[config.vanityFinish].label;
+}
+
+function setActiveViewButton(view) {
+  document.querySelectorAll(".btn-group .btn[data-view]").forEach(b => {
+    b.classList.toggle("active", b.dataset.view === view);
+  });
+}
+
 function setupUI() {
   // File uploads
   document.getElementById("file-floor").addEventListener("change", async (e) => {
@@ -1783,10 +1969,19 @@ function setupUI() {
     document.getElementById("panel").classList.toggle("hidden");
   document.getElementById("btn-panel-close").onclick = () =>
     document.getElementById("panel").classList.add("hidden");
-  document.getElementById("btn-top").onclick = () => setView("top");
-  document.getElementById("btn-bath").onclick = () => setView("bath");
-  document.getElementById("btn-wc").onclick = () => setView("wc");
-  document.getElementById("btn-reset").onclick = () => setView("default");
+
+  document.getElementById("btn-top").onclick   = () => { setView("top");     setActiveViewButton("top"); };
+  document.getElementById("btn-bath").onclick  = () => { setView("bath");    setActiveViewButton("bath"); };
+  document.getElementById("btn-wc").onclick    = () => { setView("wc");      setActiveViewButton("wc"); };
+  document.getElementById("btn-reset").onclick = () => { setView("default"); setActiveViewButton("default"); };
+
+  document.getElementById("btn-screenshot").onclick = takeScreenshot;
+  document.getElementById("btn-save").onclick = saveDesign;
+  document.getElementById("btn-load").onclick = () => document.getElementById("file-load").click();
+  document.getElementById("file-load").addEventListener("change", async (e) => {
+    if (e.target.files[0]) await loadDesign(e.target.files[0]);
+    e.target.value = "";
+  });
 }
 
 function updateLegend() {
@@ -1820,6 +2015,7 @@ async function init() {
   setupUI();
   rebuildScene();
   setView("default");
+  setActiveViewButton("default");
   updateLegend();
   updateMetaLabels();
   onResize();
