@@ -1013,7 +1013,26 @@ function buildDoorPanel(parent, xCenter, zWall, facing, dw) {
 function buildSmallSinkSouthWall(parent, xCenter, zWall) {
   const w = 0.42, d = 0.30, top = 0.92;
   const cz = zWall + d / 2;
+
+  // Malá podumyvadlová skříňka v dekoru zvoleném pro koupelnové umyvadlo
+  const cabW = 0.42, cabD = 0.28, cabBaseY = 0.10, cabH = 0.74;
+  const cabTopY = cabBaseY + cabH; // 0.84 – přímo pod countertopem (sink top 0.92, deska 0.06 tlustá)
+  const cabCz = zWall + cabD / 2;
+  const cabM = makeVanityMaterial();
+  box(parent, cabW, cabH, cabD, xCenter, cabBaseY + cabH / 2, cabCz, cabM);
+  // Šuplíková spára (vodorovná drážka 2/3 nahoře)
+  box(parent, cabW + 0.002, 0.002, cabD + 0.002,
+      xCenter, cabBaseY + cabH * 0.65, cabCz,
+      mat({ color: 0x000000, roughness: 0.7 }));
+  // Úchytka uprostřed horní části
+  const handle = mat({ color: 0x222, metalness: 0.7, roughness: 0.3 });
+  box(parent, 0.14, 0.012, 0.012,
+      xCenter, cabBaseY + cabH * 0.80, cabCz + cabD / 2 + 0.006, handle);
+
+  // Vrchní deska (countertop)
   box(parent, w, 0.06, d, xCenter, top, cz, porcelain());
+
+  // Umyvadlo
   const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), porcelain());
   bowl.position.set(xCenter, top, cz);
   bowl.rotation.x = Math.PI;
