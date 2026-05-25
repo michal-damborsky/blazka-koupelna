@@ -1732,8 +1732,17 @@ function rebuildScene() {
   // má vlastní obklad. Bath.north = strana koupelny, WC.south = strana WC.
   applySharedWallMaterials(bathShell, bw, h);
 
-  // V WC obklad jen do dané výšky – nad bílá omítka
-  buildWCWhitePaintAbove(wcRoom, ww, wd, h, config.wcTileMaxHeight);
+  // V WC obklad jen do dané výšky – nad bílá omítka.
+  // Overlay panely se musí skrývat společně s mateřskou stěnou,
+  // jinak by „prosvítání skrz stěnu" v dollhouse pohledu nefungovalo.
+  const wcPaint = buildWCWhitePaintAbove(wcRoom, ww, wd, h, config.wcTileMaxHeight);
+  if (wcPaint) {
+    if (wcPaint.north) registerDynamicWall(wcPaint.north, cam => cam.z > wcOriginZ + wd);
+    if (wcPaint.east)  registerDynamicWall(wcPaint.east,  cam => cam.x > wcOriginX + ww);
+    if (wcPaint.west)  registerDynamicWall(wcPaint.west,  cam => cam.x < wcOriginX);
+    // wcPaint.south = bílá vrstva nad sdílenou stěnou — sdílená stěna se nikdy neskrývá,
+    // takže ani overlay nemá co skrývat.
+  }
 
   const cx = bw / 2;
   const cz = (bd + T + wd) / 2;
@@ -1744,28 +1753,29 @@ function rebuildScene() {
 
 // Bílý nátěr na WC stěnách nad výškou obkladu.
 // Renderujeme jako tenké overlay panely zevnitř WC, které překryjí horní část obkladu.
-// Sdílená stěna i tři externí stěny WC dostanou bílý pruh nahoře.
+// Vrací overlay meshe podle směru, aby je bylo možné napojit na dynamické skrývání stěn.
 function buildWCWhitePaintAbove(parent, ww, wd, h, tileH) {
-  if (!Number.isFinite(tileH) || tileH >= h - 0.001) return; // nic nepřekrýt
+  if (!Number.isFinite(tileH) || tileH >= h - 0.001) return null;
   const stripH = h - tileH;
   const stripY = tileH + stripH / 2;
   const offset = 0.005; // vrstva 5 mm dovnitř WC – stabilní bez z-fightingu
   const T = 0.012; // tloušťka overlay panelu (čistě vizuální)
   const paint = mat({ color: 0xfaf8f4, roughness: 0.85, metalness: 0 });
 
-  // Sever (zadní stěna WC): panel přilepený zevnitř na +Z stěnu, čelí směrem -Z
-  // (parent = wcRoom, lokální souřadnice 0..ww v X, 0..wd v Z)
-  box(parent, ww, stripH, T,
+  const overlays = {};
+  // Sever (zadní stěna WC): panel přilepený zevnitř na +Z stěnu (parent = wcRoom)
+  overlays.north = box(parent, ww, stripH, T,
       ww / 2, stripY, wd - offset - T / 2, paint);
-  // Jih (sdílená stěna): zevnitř WC = z=0, čelí směrem +Z
-  box(parent, ww, stripH, T,
+  // Jih (sdílená stěna): zevnitř WC = z=0
+  overlays.south = box(parent, ww, stripH, T,
       ww / 2, stripY, offset + T / 2, paint);
-  // Západ (kde je toaleta): zevnitř WC, čelí směrem +X
-  box(parent, T, stripH, wd,
+  // Západ (kde je toaleta): zevnitř WC
+  overlays.west = box(parent, T, stripH, wd,
       offset + T / 2, stripY, wd / 2, paint);
-  // Východ: zevnitř WC, čelí směrem -X
-  box(parent, T, stripH, wd,
+  // Východ: zevnitř WC
+  overlays.east = box(parent, T, stripH, wd,
       ww - offset - T / 2, stripY, wd / 2, paint);
+  return overlays;
 }
 
 function applySharedWallMaterials(bathShell, w, h) {
