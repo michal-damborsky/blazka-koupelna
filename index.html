@@ -1069,11 +1069,15 @@ function buildShower(parent, w, d) {
   drain.position.set(cx, tray + 0.003, cz);
   parent.add(drain);
 
+  // Tenké čiré sklo s minimálními odlesky – jen lehký opar přes obraz pozadí
   const glassM = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, transparent: true, opacity: 0.16,
-    roughness: 0.12, metalness: 0,
-    transmission: 0.86, thickness: 0.015,
-    envMapIntensity: 0.45,
+    color: 0xffffff,
+    transparent: true, opacity: 0.06,
+    roughness: 0.35, metalness: 0,
+    transmission: 0.96, thickness: 0.004,
+    ior: 1.05,
+    envMapIntensity: 0.05,
+    specularIntensity: 0.15,
     side: THREE.DoubleSide
   });
   const shape = new THREE.Shape();
