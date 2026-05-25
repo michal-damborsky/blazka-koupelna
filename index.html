@@ -194,6 +194,22 @@
       color: #98a0a8; font-size: 0.74rem; flex: 0 0 auto;
       font-weight: 500;
     }
+    .row .inline-checkbox {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.78rem; color: #4a5460; font-weight: 500;
+      cursor: pointer; flex: 0 0 auto;
+      padding: 4px 8px; border-radius: 6px;
+      border: 1px solid #ccd1d8; background: #fff;
+      user-select: none;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .row .inline-checkbox:hover { background: #f4f6f8; }
+    .row .inline-checkbox input[type=checkbox] {
+      margin: 0; cursor: pointer; accent-color: #3d6b4f;
+    }
+    .row .inline-checkbox:has(input:checked) {
+      background: #eef4f0; border-color: #3d6b4f; color: #2c4d39;
+    }
 
     /* Texture/swatch + file picker (legacy) */
     .swatch {
@@ -654,18 +670,15 @@
         <div class="content">
           <div class="row">
             <label>Pás</label>
-            <select id="shower-strip-mode">
-              <option value="off" selected>Vypnuto</option>
-              <option value="left">Vlevo (zadní stěna)</option>
-              <option value="right">Vpravo (boční stěna)</option>
-            </select>
+            <label class="inline-checkbox"><input type="checkbox" id="shower-strip-left">Vlevo (zadní)</label>
+            <label class="inline-checkbox"><input type="checkbox" id="shower-strip-right">Vpravo (boční)</label>
           </div>
           <div class="row">
             <label>Šířka</label>
-            <input type="number" id="shower-strip-w" value="40" min="10" max="90">
+            <input type="number" id="shower-strip-w" value="90" min="10" max="90">
             <span class="unit">cm</span>
           </div>
-          <p class="hint">Vertikální akcentní pás uvnitř sprchy v dekoru sekce „Akcent" (výchozí = podlahový vzor).</p>
+          <p class="hint">Vertikální akcentní pás od podlahy ke stropu, lícuje s okolním obkladem. Dekor přebírá ze sekce „Akcent" (výchozí = podlahový vzor).</p>
         </div>
       </details>
 
@@ -767,9 +780,10 @@ const config = {
   wcGeberitDepth: 0.20,
   wcGeberitHeight: 1.20,
   wcTileMaxHeight: 1.20,         // V WC obklad jen do této výšky (nad bílá omítka)
-  // Akcentní pás ve sprchovém koutu
-  showerStripMode: "off",        // "off" | "left" (zadní/severní stěna) | "right" (boční/východní stěna)
-  showerStripWidth: 0.40         // šířka pásu v metrech
+  // Akcentní pás ve sprchovém koutu (každá strana nezávisle)
+  showerStripLeft: false,        // pás na zadní (severní) stěně sprchy
+  showerStripRight: false,       // pás na boční (východní) stěně sprchy
+  showerStripWidth: 0.90         // šířka pásu v metrech (default = celá strana sprchy)
 };
 
 const VANITY_PRESETS = {
@@ -1399,45 +1413,45 @@ function buildRoomShell(parent, originX, originZ, w, d, h, walls, slots) {
 
 // ---------- Furniture ----------
 
-// Vertikální akcentní pás uvnitř sprchového koutu (NE roh).
-// mode: "left" = na zadní (severní) stěně; "right" = na boční (východní) stěně.
-// Pás vyčnívá ~6 mm před stěnu, šířka stripWidth, výška od ~12 cm nad podlahou
-// do ~12 cm pod stropem (pro přirozený vzhled).
-function buildShowerAccentStrip(parent, w, d, h, mode, stripWidth) {
-  if (mode !== "left" && mode !== "right") return;
-  if (!accentCompositeTex) return;
+// Vertikální akcentní pás uvnitř sprchového koutu — NE roh.
+// leftOn = pás na zadní (severní) stěně sprchy, rightOn = na boční (východní).
+// Lze obojí současně. Pás je od podlahy ke stropu a lícuje s okolním obkladem
+// (žádné vystupování do prostoru, jen tenký překryv proti z-fightingu).
+function buildShowerAccentStrip(parent, w, d, h, leftOn, rightOn, stripWidth) {
+  const out = { left: null, right: null };
+  if ((!leftOn && !rightOn) || !accentCompositeTex) return out;
   const sz = 0.90; // velikost sprchové vaničky (ladí s buildShower)
-  const stripW = Math.max(0.10, Math.min(stripWidth || 0.40, sz));
-  const stripH = Math.max(0.40, h - 0.24); // 12 cm nad zemí + 12 cm pod stropem
-  const stripY = 0.12 + stripH / 2;
-  const offset = 0.006; // vyčnívání pásu před stěnou
+  const stripW = Math.max(0.10, Math.min(stripWidth || 0.90, sz));
+  const stripH = h; // od země ke stropu
+  const stripY = stripH / 2;
+  const eps = 0.002; // 2 mm anti-z-fight, prakticky lícuje s obkladem
 
-  if (mode === "left") {
-    // Na severní (zadní) stěně sprchy. Pás vodorovně blíž k vstupu do sprchy
-    // (na západní hraně sprchového koutu, tj. minimální x sprchy)
+  if (leftOn) {
+    // Severní (zadní = sdílená) stěna sprchy. Šířka jde od západní hrany sprchy směrem k rohu.
     const xMin = w - sz;
     const px = xMin + stripW / 2;
     const m = makeWallMaterial(stripW, stripH, "accent");
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(stripW, stripH, 0.012),
-      m
-    );
-    mesh.position.set(px, stripY, d - offset);
-    mesh.castShadow = true; mesh.receiveShadow = true;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(stripW, stripH), m);
+    mesh.rotation.y = Math.PI; // normála do místnosti (-Z)
+    mesh.position.set(px, stripY, d - eps);
+    mesh.receiveShadow = true;
     parent.add(mesh);
-  } else {
-    // Na východní (boční) stěně sprchy. Pás na jižní hraně sprchového koutu
+    out.left = mesh;
+  }
+
+  if (rightOn) {
+    // Východní (boční) stěna sprchy. Šířka jde od jižní hrany sprchy směrem k rohu.
     const zMin = d - sz;
     const pz = zMin + stripW / 2;
     const m = makeWallMaterial(stripW, stripH, "accent");
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.012, stripH, stripW),
-      m
-    );
-    mesh.position.set(w - offset, stripY, pz);
-    mesh.castShadow = true; mesh.receiveShadow = true;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(stripW, stripH), m);
+    mesh.rotation.y = -Math.PI / 2; // normála do místnosti (-X)
+    mesh.position.set(w - eps, stripY, pz);
+    mesh.receiveShadow = true;
     parent.add(mesh);
+    out.right = mesh;
   }
+  return out;
 }
 
 function buildShower(parent, w, d) {
@@ -1752,7 +1766,12 @@ function rebuildScene() {
   registerDynamicWall(bathShell.walls.west,  cam => cam.x < bathOriginX);
 
   buildShower(bathRoom, bw, bd);
-  buildShowerAccentStrip(bathRoom, bw, bd, h, config.showerStripMode, config.showerStripWidth);
+  const showerStrips = buildShowerAccentStrip(bathRoom, bw, bd, h, config.showerStripLeft, config.showerStripRight, config.showerStripWidth);
+  // Pravý pás sedí na východní stěně koupelny → skrývej spolu s ní v dollhouse pohledu.
+  // Levý pás je na sdílené stěně – ta se nikdy neskrývá, takže ho neregistrujeme.
+  if (showerStrips.right) {
+    registerDynamicWall(showerStrips.right, cam => cam.x > bathOriginX + bw);
+  }
   buildVanityEastWall(bathRoom, bw, 0.10);
   buildWasher(bathRoom, 0.05, bd - 0.62);
   buildRadiator(bathRoom, 0, 0.10, Math.min(0.10 + 0.7, bd - 0.70));
@@ -2276,9 +2295,11 @@ function readConfigFromUI() {
   config.wcGeberitDepth  = cmRange("wc-geberit-d", 10, 40,  Math.round(config.wcGeberitDepth  * 100));
   config.wcTileMaxHeight = cmRange("wc-tile-h",   60, 280, Math.round(config.wcTileMaxHeight * 100));
 
-  // Akcentní pás ve sprše
-  const stripModeEl = document.getElementById("shower-strip-mode");
-  if (stripModeEl) config.showerStripMode = stripModeEl.value;
+  // Akcentní pás ve sprše (nezávisle vlevo a/nebo vpravo)
+  const stripL = document.getElementById("shower-strip-left");
+  const stripR = document.getElementById("shower-strip-right");
+  if (stripL) config.showerStripLeft  = !!stripL.checked;
+  if (stripR) config.showerStripRight = !!stripR.checked;
   config.showerStripWidth = cmRange("shower-strip-w", 10, 90, Math.round(config.showerStripWidth * 100));
 }
 
@@ -2322,10 +2343,12 @@ function updateMetaLabels() {
     el("meta-wc-fit").textContent = parts.join(" · ");
   }
   if (el("meta-shower")) {
-    const m = config.showerStripMode;
-    if (m === "left")       el("meta-shower").textContent = `Pás vlevo · ${(config.showerStripWidth*100)|0} cm`;
-    else if (m === "right") el("meta-shower").textContent = `Pás vpravo · ${(config.showerStripWidth*100)|0} cm`;
-    else                    el("meta-shower").textContent = "Vypnuto";
+    const sides = [];
+    if (config.showerStripLeft)  sides.push("vlevo");
+    if (config.showerStripRight) sides.push("vpravo");
+    el("meta-shower").textContent = sides.length
+      ? `Pás ${sides.join(" + ")} · ${(config.showerStripWidth*100)|0} cm`
+      : "Vypnuto";
   }
   // Rozměry v hlavičkách plánů stěn
   document.querySelectorAll(".room-plan-label").forEach(lbl => {
@@ -2528,7 +2551,10 @@ async function loadDesign(file) {
   const legacy = data.config;
   const hadGeberit = ("wcGeberitEnabled" in legacy);
   const hadTileMaxH = ("wcTileMaxHeight" in legacy);
-  const hadShower   = ("showerStripMode" in legacy);
+  // Starší formát používal jediný showerStripMode ("off"|"left"|"right"), nový má
+  // dva nezávislé booleany showerStripLeft/Right.
+  const hadShowerOld = ("showerStripMode" in legacy);
+  const hadShowerNew = ("showerStripLeft"  in legacy) || ("showerStripRight" in legacy);
 
   // Merge config (zachovat defaulty pro chybějící klíče)
   Object.assign(config, data.config);
@@ -2538,10 +2564,23 @@ async function loadDesign(file) {
   // Pro starší soubory: vypnout novinky, aby vypadaly stejně jako před změnou
   if (!hadGeberit)  config.wcGeberitEnabled = false;
   if (!hadTileMaxH) config.wcTileMaxHeight = config.roomH; // tj. obklad přes celou výšku
-  if (!hadShower) {
-    config.showerStripMode  = "off";
+
+  // Migrace pásu sprchy: starý showerStripMode → nové booleany
+  if (hadShowerOld && !hadShowerNew) {
+    const m = legacy.showerStripMode;
+    config.showerStripLeft  = (m === "left");
+    config.showerStripRight = (m === "right");
+    // ponecháme legacy showerStripWidth (0.40 cm pro úplně staré návrhy)
+    if (!("showerStripWidth" in legacy)) config.showerStripWidth = 0.40;
+  } else if (!hadShowerOld && !hadShowerNew) {
+    // úplně staré návrhy bez funkce – pás vypnutý
+    config.showerStripLeft  = false;
+    config.showerStripRight = false;
     config.showerStripWidth = 0.40;
   }
+  // odstraň zastaralý klíč, ať nezatěžuje export
+  delete config.showerStripMode;
+
   // Starší saves neměly doorFinish – dveře byly natvrdo přírodní dub.
   if (!("doorFinish" in legacy)) config.doorFinish = "naturalOak";
 
@@ -2593,8 +2632,11 @@ function syncUIFromConfig() {
   setVal("wc-geberit-h", Math.round(config.wcGeberitHeight * 100));
   setVal("wc-geberit-d", Math.round(config.wcGeberitDepth  * 100));
   setVal("wc-tile-h",    Math.round(config.wcTileMaxHeight * 100));
-  setVal("shower-strip-mode", config.showerStripMode || "off");
-  setVal("shower-strip-w",    Math.round((config.showerStripWidth || 0.40) * 100));
+  const stripL = document.getElementById("shower-strip-left");
+  const stripR = document.getElementById("shower-strip-right");
+  if (stripL) stripL.checked = !!config.showerStripLeft;
+  if (stripR) stripR.checked = !!config.showerStripRight;
+  setVal("shower-strip-w",    Math.round((config.showerStripWidth || 0.90) * 100));
 
   // Sync wall plan buttons
   document.querySelectorAll(".wall-plan .wall-btn[data-wall]").forEach(btn => {
@@ -2630,7 +2672,13 @@ function setupUI() {
   // Selects — immediate apply on change
   ["floor-bond", "floor-direction", "wall-bond", "wall-direction",
    "accent-bond", "accent-direction",
-   "wc-geberit", "shower-strip-mode"].forEach(id => {
+   "wc-geberit"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", applyAndRebuild);
+  });
+
+  // Checkboxy — immediate apply on change
+  ["shower-strip-left", "shower-strip-right"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", applyAndRebuild);
   });
